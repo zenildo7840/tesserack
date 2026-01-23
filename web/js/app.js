@@ -1,5 +1,6 @@
 // app.js - Main entry point for Tesserack
 import { Emulator } from './emulator.js';
+import { initLLM, generate, isReady } from './llm.js';
 
 console.log('Tesserack loading...');
 
@@ -23,6 +24,35 @@ const turboABtn = document.getElementById('turbo-a-btn');
 let emulator = null;
 let turboAInterval = null;
 let savedState = null;
+let llmInitialized = false;
+
+// Initialize AI model
+async function initializeAI() {
+    const progressContainer = document.getElementById('progress-container');
+    const progressBar = document.getElementById('progress-bar');
+    const progressText = document.getElementById('progress-text');
+
+    progressContainer.style.display = 'flex';
+    statusText.textContent = 'Loading AI model...';
+
+    try {
+        await initLLM((progress) => {
+            const pct = Math.round(progress.progress * 100);
+            progressBar.style.setProperty('--progress', `${pct}%`);
+            progressText.textContent = `${pct}%`;
+            statusText.textContent = progress.text || 'Loading AI model...';
+        });
+
+        progressContainer.style.display = 'none';
+        statusText.textContent = 'Ready! Click Turbo or LLM to start.';
+        llmBtn.disabled = false;
+        llmInitialized = true;
+    } catch (err) {
+        progressContainer.style.display = 'none';
+        statusText.textContent = `AI Error: ${err.message}`;
+        console.error('AI initialization error:', err);
+    }
+}
 
 // ROM drop handling
 romDrop.addEventListener('click', () => romInput.click());
@@ -59,9 +89,9 @@ async function loadROM(file) {
         romDrop.style.display = 'none';
         gameCanvas.style.display = 'block';
 
-        // Enable buttons
+        // Enable buttons (except LLM which requires AI to be loaded)
         turboBtn.disabled = false;
-        llmBtn.disabled = false;
+        llmBtn.disabled = true; // Will be enabled after LLM loads
         saveBtn.disabled = false;
         loadBtn.disabled = false;
         stopBtn.disabled = false;
@@ -72,8 +102,11 @@ async function loadROM(file) {
         // Start emulator display loop
         emulator.start();
 
-        statusText.textContent = 'ROM loaded! Use controls or click Turbo/LLM to start AI.';
+        statusText.textContent = 'ROM loaded! Loading AI model...';
         updateGameStateDisplay();
+
+        // Initialize AI after ROM loads
+        initializeAI();
     } catch (err) {
         statusText.textContent = `Error: ${err.message}`;
         console.error('Failed to load ROM:', err);
