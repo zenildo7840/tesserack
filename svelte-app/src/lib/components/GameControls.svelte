@@ -86,26 +86,33 @@
     }
 
     .dpad-btn {
-        width: 36px;
-        height: 36px;
-        background: var(--bg-input);
-        color: var(--text-secondary);
-        border-radius: 6px;
+        width: 40px;
+        height: 40px;
+        background: var(--bg-dark);
+        color: var(--text-primary);
+        border-radius: 8px;
         font-size: 14px;
         display: flex;
         align-items: center;
         justify-content: center;
         border: 1px solid var(--border-color);
+        transition: all 0.1s ease;
+    }
+
+    .dpad-btn :global(svg) {
+        stroke-width: 2.5;
     }
 
     .dpad-btn:hover {
         background: var(--border-color);
-        color: var(--text-primary);
+        color: var(--accent-primary);
+        transform: scale(1.05);
     }
 
     .dpad-btn:active {
         background: var(--accent-primary);
         color: white;
+        transform: scale(0.95);
     }
 
     .action-buttons {
