@@ -113,6 +113,17 @@ export class RLAgent {
         // Policy parameters (simple weighted selection)
         this.explorationRate = 0.2;  // 20% random exploration
         this.useActionStats = true;  // Use learned action statistics
+
+        // Optional external reward source (e.g., CombinedRewardSystem)
+        this.externalRewardSource = null;
+    }
+
+    /**
+     * Set an external reward source (e.g., CombinedRewardSystem)
+     * @param {Object} source - Object with processStep(state) method
+     */
+    setExternalRewardSource(source) {
+        this.externalRewardSource = source;
     }
 
     /**
@@ -259,31 +270,49 @@ export class RLAgent {
         const currState = this.reader.getGameState();
 
         if (this.prevState && this.prevActions) {
-            // Compute reward
-            const { total: reward, breakdown } = this.rewardCalc.computeReward(
+            // Compute base reward from reward calculator
+            const { total: baseReward, breakdown } = this.rewardCalc.computeReward(
                 this.prevState, currState, this.prevActions[0]
             );
+
+            // Add external reward (from combined reward system if available)
+            let externalReward = 0;
+            let externalBreakdown = null;
+            if (this.externalRewardSource) {
+                try {
+                    const extResult = await this.externalRewardSource.processStep(currState, {
+                        generateTests: this.llmCallCount % 10 === 0,  // Generate tests every 10 steps
+                        checkVisual: true,
+                    });
+                    externalReward = extResult.reward || 0;
+                    externalBreakdown = extResult.breakdown;
+                } catch (e) {
+                    console.warn('External reward error:', e);
+                }
+            }
+
+            const totalReward = baseReward + externalReward;
 
             // Store experience
             this.expBuffer.add(
                 this.prevState,
                 this.prevActions,
-                reward,
+                totalReward,
                 currState,
                 false,
-                { plan: this.currentPlan }
+                { plan: this.currentPlan, externalReward }
             );
 
             // Update action statistics
             this.actionStats.update(
                 this.prevState.location,
                 this.prevActions,
-                reward
+                totalReward
             );
 
             // Log significant rewards
-            if (Math.abs(reward) >= 10) {
-                console.log(`Reward: ${reward}`, breakdown);
+            if (Math.abs(totalReward) >= 10) {
+                console.log(`Reward: ${totalReward} (base: ${baseReward}, external: ${externalReward})`, breakdown, externalBreakdown);
             }
         }
 

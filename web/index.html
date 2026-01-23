@@ -108,6 +108,65 @@
                         <button id="clear-data-btn" disabled>Clear Data</button>
                     </div>
                 </div>
+
+                <div class="checkpoint-panel">
+                    <h3>Visual Checkpoints</h3>
+                    <p class="panel-desc">Auto-captures when badges, Pokemon, or locations discovered</p>
+
+                    <div class="discovery-stats">
+                        <span><strong>Locations:</strong> <span id="discovered-locations">0</span></span>
+                        <span><strong>Pokemon:</strong> <span id="discovered-pokemon">0</span></span>
+                        <span><strong>Auto-Rewards:</strong> <span id="discovery-rewards">0</span></span>
+                    </div>
+
+                    <div class="discovery-feed" id="discovery-feed">
+                        <div class="no-discoveries">Discoveries will appear here...</div>
+                    </div>
+
+                    <details class="manual-checkpoints">
+                        <summary>Manual Checkpoints (optional)</summary>
+                        <div class="checkpoint-controls">
+                            <button id="capture-checkpoint-btn" disabled>Capture Screen</button>
+                            <label class="upload-btn small">
+                                Upload
+                                <input type="file" id="checkpoint-upload" accept="image/*" style="display:none">
+                            </label>
+                        </div>
+
+                        <div class="checkpoint-form" id="checkpoint-form" style="display:none">
+                            <img id="checkpoint-preview" class="checkpoint-preview">
+                            <input type="text" id="checkpoint-name" placeholder="Name">
+                            <input type="number" id="checkpoint-reward" value="200" min="10" max="2000">
+                            <div class="checkpoint-form-btns">
+                                <button id="save-checkpoint-btn">Add</button>
+                                <button id="cancel-checkpoint-btn">Cancel</button>
+                            </div>
+                        </div>
+
+                        <div class="checkpoint-list" id="checkpoint-list">
+                            <div class="no-checkpoints">No manual checkpoints</div>
+                        </div>
+                    </details>
+
+                    <div class="checkpoint-actions">
+                        <button id="export-checkpoints-btn" disabled>Export All</button>
+                        <label class="upload-btn small">
+                            Import
+                            <input type="file" id="import-checkpoints" accept=".json" style="display:none">
+                        </label>
+                    </div>
+                </div>
+
+                <div class="adaptive-panel" id="adaptive-panel" style="display:none">
+                    <h3>LLM-Generated Tests</h3>
+                    <div id="current-tests" class="test-list">
+                        <div class="no-tests">No active tests</div>
+                    </div>
+                    <div class="adaptive-stats">
+                        <div><strong>Tests Passed:</strong> <span id="tests-passed">0</span></div>
+                        <div><strong>Adaptive Reward:</strong> <span id="adaptive-reward">0</span></div>
+                    </div>
+                </div>
             </div>
         </main>
 

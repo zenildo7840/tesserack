@@ -5,6 +5,7 @@ import { initLLM, isReady } from './llm.js';
 import { GameAgent } from './agent.js';
 import { RLAgent } from './rl-agent.js';
 import { DataCollector } from './data-collector.js';
+import { CombinedRewardSystem } from './adaptive-rewards.js';
 import { saveState, loadState, hasSavedState } from './storage.js';
 
 console.log('Tesserack loading...');
@@ -42,6 +43,29 @@ const collectStatus = document.getElementById('collect-status');
 const exportTrainingBtn = document.getElementById('export-training-btn');
 const clearDataBtn = document.getElementById('clear-data-btn');
 
+// Checkpoint and discovery elements
+const discoveredLocationsSpan = document.getElementById('discovered-locations');
+const discoveredPokemonSpan = document.getElementById('discovered-pokemon');
+const discoveryRewardsSpan = document.getElementById('discovery-rewards');
+const discoveryFeed = document.getElementById('discovery-feed');
+const captureCheckpointBtn = document.getElementById('capture-checkpoint-btn');
+const checkpointUpload = document.getElementById('checkpoint-upload');
+const checkpointForm = document.getElementById('checkpoint-form');
+const checkpointPreview = document.getElementById('checkpoint-preview');
+const checkpointNameInput = document.getElementById('checkpoint-name');
+const checkpointRewardInput = document.getElementById('checkpoint-reward');
+const saveCheckpointBtn = document.getElementById('save-checkpoint-btn');
+const cancelCheckpointBtn = document.getElementById('cancel-checkpoint-btn');
+const checkpointList = document.getElementById('checkpoint-list');
+const exportCheckpointsBtn = document.getElementById('export-checkpoints-btn');
+const importCheckpointsInput = document.getElementById('import-checkpoints');
+
+// Adaptive panel elements
+const adaptivePanel = document.getElementById('adaptive-panel');
+const currentTestsDiv = document.getElementById('current-tests');
+const testsPassedSpan = document.getElementById('tests-passed');
+const adaptiveRewardSpan = document.getElementById('adaptive-reward');
+
 // Manual control buttons
 const manualButtons = document.querySelectorAll('[data-btn]');
 const turboABtn = document.getElementById('turbo-a-btn');
@@ -61,6 +85,8 @@ let rlAgent = null;
 let dataCollector = null;
 let activeAgent = null;  // Currently running agent
 let memoryReader = null;
+let rewardSystem = null;  // Combined adaptive reward system
+let pendingCheckpointImage = null;  // For manual checkpoint creation
 
 // Initialize AI model
 async function initializeAI() {
@@ -237,12 +263,26 @@ async function loadROM(file) {
         agent = new GameAgent(emulator, memoryReader, handleAgentUpdate);
         rlAgent = new RLAgent(emulator, memoryReader, handleAgentUpdate);
         dataCollector = new DataCollector(emulator, memoryReader, handleCollectorUpdate);
+        rewardSystem = new CombinedRewardSystem(gameCanvas, memoryReader);
 
         // Enable data collection buttons
         exploreBtn.disabled = false;
         recordBtn.disabled = false;
         exportTrainingBtn.disabled = true;
         clearDataBtn.disabled = true;
+
+        // Enable checkpoint buttons
+        captureCheckpointBtn.disabled = false;
+        exportCheckpointsBtn.disabled = false;
+
+        // Wire up enhanced agent handler for reward processing
+        // Defer to allow function definitions to be available
+        setTimeout(wireUpEnhancedHandler, 100);
+
+        // Connect RL agent to combined reward system
+        if (rlAgent && rewardSystem) {
+            rlAgent.setExternalRewardSource(rewardSystem);
+        }
 
         // Start emulator display loop
         emulator.start();
@@ -593,6 +633,221 @@ clearDataBtn.addEventListener('click', () => {
         clearDataBtn.disabled = true;
         statusText.textContent = 'Data cleared.';
     }
+});
+
+// ===== CHECKPOINT & DISCOVERY SYSTEM =====
+
+// Update discovery feed with new discoveries
+function updateDiscoveryFeed(discoveries) {
+    if (!discoveries || discoveries.length === 0) return;
+
+    // Remove "no discoveries" placeholder
+    const placeholder = discoveryFeed.querySelector('.no-discoveries');
+    if (placeholder) placeholder.remove();
+
+    for (const discovery of discoveries) {
+        const item = document.createElement('div');
+        item.className = `discovery-item ${discovery.significance || 'minor'}`;
+        item.innerHTML = `
+            ${discovery.image ? `<img src="${discovery.image}" class="discovery-thumb">` : ''}
+            <div class="discovery-info">
+                <strong>${discovery.name}</strong>
+                <span class="discovery-reward">+${discovery.reward}</span>
+                <div class="discovery-desc">${discovery.description}</div>
+            </div>
+        `;
+        discoveryFeed.insertBefore(item, discoveryFeed.firstChild);
+    }
+
+    // Update stats
+    if (rewardSystem) {
+        const status = rewardSystem.getStatus();
+        discoveredLocationsSpan.textContent = status.discoveries.locations;
+        discoveredPokemonSpan.textContent = status.discoveries.pokemon;
+        discoveryRewardsSpan.textContent = Math.round(status.totalReward);
+    }
+}
+
+// Update adaptive tests panel
+function updateAdaptivePanel(testStatus) {
+    if (!testStatus) return;
+
+    // Update counts
+    testsPassedSpan.textContent = testStatus.testsPassed || 0;
+    adaptiveRewardSpan.textContent = Math.round(testStatus.totalReward || 0);
+
+    // Update test list
+    if (testStatus.currentTests && testStatus.currentTests.length > 0) {
+        currentTestsDiv.innerHTML = testStatus.currentTests.map(t => `
+            <div class="test-item ${t.passed ? 'passed' : ''}">
+                <span class="test-check">${t.passed ? '✓' : '○'}</span>
+                <span class="test-desc">${t.test}</span>
+                <span class="test-reward">+${t.reward}</span>
+            </div>
+        `).join('');
+    } else {
+        currentTestsDiv.innerHTML = '<div class="no-tests">No active tests</div>';
+    }
+}
+
+// Update manual checkpoint list
+function updateCheckpointList() {
+    if (!rewardSystem) return;
+
+    const status = rewardSystem.visualCheckpoints.getStatus();
+
+    if (status.checkpoints.length === 0) {
+        checkpointList.innerHTML = '<div class="no-checkpoints">No manual checkpoints</div>';
+        return;
+    }
+
+    checkpointList.innerHTML = status.checkpoints.map(cp => `
+        <div class="checkpoint-item ${cp.reached ? 'reached' : ''}">
+            <span class="checkpoint-status">${cp.reached ? '✓' : '○'}</span>
+            <span class="checkpoint-name">${cp.name}</span>
+            <span class="checkpoint-reward">+${cp.reward}</span>
+        </div>
+    `).join('');
+}
+
+// Process reward system step (called from agent update)
+async function processRewardStep(state) {
+    if (!rewardSystem) return;
+
+    const result = await rewardSystem.processStep(state, {
+        generateTests: llmInitialized,
+        checkVisual: true,
+        recordFrames: true
+    });
+
+    // Update UI if discoveries were made
+    if (result.discoveries) {
+        updateDiscoveryFeed(result.discoveries);
+    }
+
+    // Update adaptive panel
+    if (adaptivePanel.style.display !== 'none') {
+        updateAdaptivePanel(rewardSystem.adaptiveRewards.getStatus());
+    }
+
+    return result;
+}
+
+// Hook into agent update to process rewards
+const originalHandleAgentUpdate = handleAgentUpdate;
+function enhancedHandleAgentUpdate(update) {
+    originalHandleAgentUpdate(update);
+
+    // Process rewards asynchronously
+    if (update.state) {
+        processRewardStep(update.state);
+    }
+}
+
+// Replace handler on agents (will be done after initialization)
+function wireUpEnhancedHandler() {
+    if (agent) agent.onUpdate = enhancedHandleAgentUpdate;
+    if (rlAgent) rlAgent.onUpdate = enhancedHandleAgentUpdate;
+}
+
+// Checkpoint capture button
+captureCheckpointBtn.addEventListener('click', () => {
+    if (!gameCanvas) return;
+
+    pendingCheckpointImage = gameCanvas.toDataURL('image/png', 0.9);
+    checkpointPreview.src = pendingCheckpointImage;
+    checkpointNameInput.value = '';
+    checkpointRewardInput.value = '200';
+    checkpointForm.style.display = 'block';
+});
+
+// Checkpoint upload
+checkpointUpload.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+        pendingCheckpointImage = event.target.result;
+        checkpointPreview.src = pendingCheckpointImage;
+        checkpointNameInput.value = file.name.replace(/\.[^/.]+$/, '');
+        checkpointRewardInput.value = '200';
+        checkpointForm.style.display = 'block';
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';  // Reset input
+});
+
+// Save checkpoint
+saveCheckpointBtn.addEventListener('click', () => {
+    if (!rewardSystem || !pendingCheckpointImage) return;
+
+    const name = checkpointNameInput.value.trim() || `Checkpoint ${Date.now()}`;
+    const reward = parseInt(checkpointRewardInput.value) || 200;
+
+    rewardSystem.visualCheckpoints.addCheckpointFromImage(
+        name,
+        pendingCheckpointImage,
+        `Manual checkpoint: ${name}`,
+        reward
+    );
+
+    checkpointForm.style.display = 'none';
+    pendingCheckpointImage = null;
+    updateCheckpointList();
+    statusText.textContent = `Checkpoint "${name}" added (+${reward} reward)`;
+});
+
+// Cancel checkpoint
+cancelCheckpointBtn.addEventListener('click', () => {
+    checkpointForm.style.display = 'none';
+    pendingCheckpointImage = null;
+});
+
+// Export checkpoints
+exportCheckpointsBtn.addEventListener('click', () => {
+    if (!rewardSystem) return;
+
+    const data = rewardSystem.exportData();
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `tesserack-checkpoints-${Date.now()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    statusText.textContent = 'Checkpoints exported!';
+});
+
+// Import checkpoints
+importCheckpointsInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file || !rewardSystem) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+        try {
+            const data = JSON.parse(event.target.result);
+            if (data.checkpoints) {
+                rewardSystem.visualCheckpoints.importCheckpoints(data);
+            }
+            if (data.discoveries) {
+                rewardSystem.autoDiscovery.importDiscoveries(data);
+            }
+            updateCheckpointList();
+            statusText.textContent = 'Checkpoints imported!';
+        } catch (err) {
+            statusText.textContent = 'Import failed: ' + err.message;
+        }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+});
+
+// Show adaptive panel when RL+LLM mode is active
+const originalRlBtnHandler = rlBtn.onclick;
+rlBtn.addEventListener('click', () => {
+    adaptivePanel.style.display = 'block';
 });
 
 console.log('Tesserack ready');

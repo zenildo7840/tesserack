@@ -555,3 +555,397 @@ h3 {
 #clear-data-btn:hover:not(:disabled) {
     background: #95a5a6;
 }
+
+/* Checkpoint Panel */
+.checkpoint-panel {
+    background: #16213e;
+    border-radius: 10px;
+    padding: 15px;
+    border: 2px solid #f39c12;
+}
+
+.panel-desc {
+    font-size: 11px;
+    color: #888;
+    margin-bottom: 10px;
+}
+
+.discovery-stats {
+    display: flex;
+    gap: 15px;
+    font-size: 12px;
+    margin-bottom: 10px;
+    padding: 8px;
+    background: #0f0f1a;
+    border-radius: 5px;
+}
+
+.discovery-stats span span {
+    color: #f39c12;
+    font-weight: bold;
+}
+
+.discovery-feed {
+    background: #0f0f1a;
+    border-radius: 5px;
+    padding: 8px;
+    max-height: 120px;
+    overflow-y: auto;
+    margin-bottom: 10px;
+}
+
+.no-discoveries {
+    color: #666;
+    font-size: 11px;
+    text-align: center;
+    padding: 10px;
+}
+
+.discovery-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px;
+    border-radius: 4px;
+    margin-bottom: 4px;
+    font-size: 11px;
+    animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+    from { opacity: 0; transform: translateX(-10px); }
+    to { opacity: 1; transform: translateX(0); }
+}
+
+.discovery-item.badge { background: rgba(231, 76, 60, 0.2); }
+.discovery-item.pokemon { background: rgba(46, 204, 113, 0.2); }
+.discovery-item.location { background: rgba(52, 152, 219, 0.2); }
+.discovery-item.battle { background: rgba(155, 89, 182, 0.2); }
+
+.discovery-item img {
+    width: 40px;
+    height: 36px;
+    object-fit: contain;
+    background: #000;
+    border-radius: 3px;
+}
+
+.discovery-item .info,
+.discovery-info {
+    flex: 1;
+}
+
+.discovery-item .name,
+.discovery-info strong {
+    font-weight: bold;
+}
+
+.discovery-item .reward,
+.discovery-reward {
+    color: #f39c12;
+    font-weight: bold;
+    margin-left: 5px;
+}
+
+.discovery-desc {
+    font-size: 10px;
+    color: #888;
+}
+
+.discovery-thumb {
+    width: 40px;
+    height: 36px;
+    object-fit: contain;
+    background: #000;
+    border-radius: 3px;
+}
+
+.discovery-item.major {
+    border-left: 3px solid #e74c3c;
+}
+
+.discovery-item.medium {
+    border-left: 3px solid #f39c12;
+}
+
+.discovery-item.minor {
+    border-left: 3px solid #3498db;
+}
+
+.manual-checkpoints {
+    margin-bottom: 10px;
+}
+
+.manual-checkpoints summary {
+    cursor: pointer;
+    font-size: 11px;
+    color: #888;
+    padding: 5px 0;
+}
+
+.manual-checkpoints summary:hover {
+    color: #fff;
+}
+
+.manual-checkpoints[open] {
+    background: #0f0f1a;
+    border-radius: 5px;
+    padding: 10px;
+}
+
+.manual-checkpoints .checkpoint-controls {
+    margin-top: 10px;
+}
+
+.checkpoint-controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.checkpoint-controls button,
+.upload-btn {
+    padding: 8px 12px;
+    border: none;
+    border-radius: 5px;
+    font-family: inherit;
+    font-size: 12px;
+    cursor: pointer;
+    background: #f39c12;
+    color: #1a1a2e;
+    font-weight: bold;
+}
+
+.upload-btn {
+    display: inline-block;
+    text-align: center;
+}
+
+.upload-btn.small {
+    padding: 6px 10px;
+    font-size: 11px;
+}
+
+.checkpoint-controls button:hover:not(:disabled),
+.upload-btn:hover {
+    background: #f5ab35;
+}
+
+.checkpoint-controls button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.checkpoint-form {
+    background: #0f0f1a;
+    padding: 12px;
+    border-radius: 8px;
+    margin-bottom: 10px;
+}
+
+.checkpoint-preview {
+    width: 160px;
+    height: 144px;
+    object-fit: contain;
+    background: #000;
+    border-radius: 4px;
+    margin-bottom: 8px;
+    display: block;
+}
+
+.checkpoint-form input[type="text"],
+.checkpoint-form input[type="number"] {
+    width: 100%;
+    padding: 8px;
+    margin-bottom: 8px;
+    border: 1px solid #333;
+    border-radius: 4px;
+    background: #1a1a2e;
+    color: #fff;
+    font-family: inherit;
+    font-size: 12px;
+}
+
+.checkpoint-form input[type="number"] {
+    width: 80px;
+}
+
+.checkpoint-form-btns {
+    display: flex;
+    gap: 8px;
+}
+
+.checkpoint-form-btns button {
+    padding: 6px 12px;
+    border: none;
+    border-radius: 4px;
+    font-size: 11px;
+    cursor: pointer;
+}
+
+#save-checkpoint-btn {
+    background: #27ae60;
+    color: #fff;
+}
+
+#cancel-checkpoint-btn {
+    background: #7f8c8d;
+    color: #fff;
+}
+
+.checkpoint-list {
+    background: #0f0f1a;
+    border-radius: 5px;
+    padding: 10px;
+    max-height: 150px;
+    overflow-y: auto;
+    margin-bottom: 10px;
+}
+
+.no-checkpoints, .no-tests {
+    color: #666;
+    font-size: 12px;
+    text-align: center;
+    padding: 10px;
+}
+
+.checkpoint-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px;
+    border-bottom: 1px solid #333;
+}
+
+.checkpoint-item:last-child {
+    border-bottom: none;
+}
+
+.checkpoint-item img {
+    width: 48px;
+    height: 43px;
+    object-fit: contain;
+    background: #000;
+    border-radius: 3px;
+}
+
+.checkpoint-item .info {
+    flex: 1;
+    font-size: 11px;
+}
+
+.checkpoint-item .name {
+    font-weight: bold;
+    color: #f39c12;
+}
+
+.checkpoint-item .reward {
+    color: #4ecdc4;
+}
+
+.checkpoint-item.reached {
+    opacity: 0.6;
+}
+
+.checkpoint-item.reached .name::after {
+    content: ' ✓';
+    color: #27ae60;
+}
+
+.checkpoint-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.checkpoint-actions button {
+    padding: 6px 12px;
+    border: none;
+    border-radius: 5px;
+    font-size: 11px;
+    cursor: pointer;
+    background: #3498db;
+    color: #fff;
+}
+
+.checkpoint-actions button:disabled {
+    background: #333;
+    color: #666;
+}
+
+/* Adaptive Panel */
+.adaptive-panel {
+    background: #16213e;
+    border-radius: 10px;
+    padding: 15px;
+    border: 2px solid #9b59b6;
+}
+
+.test-list {
+    background: #0f0f1a;
+    border-radius: 5px;
+    padding: 10px;
+    margin-bottom: 10px;
+    max-height: 120px;
+    overflow-y: auto;
+}
+
+.test-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 0;
+    font-size: 11px;
+}
+
+.test-item .status,
+.test-check {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #333;
+    text-align: center;
+    line-height: 16px;
+    font-size: 10px;
+}
+
+.test-item .status.passed,
+.test-item.passed .test-check {
+    background: #27ae60;
+    color: #fff;
+}
+
+.test-item .desc,
+.test-desc {
+    flex: 1;
+}
+
+.test-item .reward,
+.test-reward {
+    color: #4ecdc4;
+    font-weight: bold;
+}
+
+.checkpoint-status {
+    width: 16px;
+    text-align: center;
+}
+
+.checkpoint-name {
+    flex: 1;
+}
+
+.checkpoint-reward {
+    color: #4ecdc4;
+    font-size: 11px;
+}
+
+.adaptive-stats {
+    font-size: 12px;
+    display: flex;
+    gap: 20px;
+}
+
+.adaptive-stats span {
+    color: #9b59b6;
+    font-weight: bold;
+}
