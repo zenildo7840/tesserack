@@ -7,6 +7,7 @@ import { RLAgent } from './rl-agent.js';
 import { DataCollector } from './data-collector.js';
 import { CombinedRewardSystem } from './adaptive-rewards.js';
 import { TrainedPolicy, AutoTrainingManager } from './trained-policy.js';
+import * as persistence from './persistence.js';
 
 // Store references
 import {
@@ -56,6 +57,103 @@ let policy = null;
 let autoTrainerInstance = null;
 let canvas = null;
 
+// Persistence tracking
+let unsavedExperiences = [];
+let saveInterval = null;
+const SAVE_INTERVAL_MS = 30000; // Save every 30 seconds
+const SAVE_BATCH_SIZE = 50; // Or when we have 50+ unsaved experiences
+
+/**
+ * Queue an experience for persistence
+ */
+function queueExperienceForSave(experience) {
+    unsavedExperiences.push(experience);
+
+    // Save immediately if we have enough
+    if (unsavedExperiences.length >= SAVE_BATCH_SIZE) {
+        flushExperiences();
+    }
+}
+
+/**
+ * Flush unsaved experiences to IndexedDB
+ */
+async function flushExperiences() {
+    if (unsavedExperiences.length === 0) return;
+
+    const toSave = [...unsavedExperiences];
+    unsavedExperiences = [];
+
+    try {
+        await persistence.saveExperiences(toSave);
+        console.log(`[Persistence] Saved ${toSave.length} experiences`);
+    } catch (e) {
+        console.error('[Persistence] Failed to save experiences:', e);
+        // Put them back for retry
+        unsavedExperiences = [...toSave, ...unsavedExperiences];
+    }
+}
+
+/**
+ * Save discovery to persistence
+ */
+async function persistDiscovery(discovery) {
+    try {
+        await persistence.saveDiscovery(discovery);
+    } catch (e) {
+        console.error('[Persistence] Failed to save discovery:', e);
+    }
+}
+
+/**
+ * Setup auto-save interval and beforeunload handler
+ */
+function setupPersistence() {
+    // Periodic save
+    if (saveInterval) clearInterval(saveInterval);
+    saveInterval = setInterval(flushExperiences, SAVE_INTERVAL_MS);
+
+    // Save on page unload
+    window.addEventListener('beforeunload', () => {
+        flushExperiences();
+    });
+}
+
+/**
+ * Restore persisted data on load
+ */
+async function restorePersistedData() {
+    try {
+        const stats = await persistence.getStorageStats();
+        console.log('[Persistence] Storage stats:', stats);
+
+        // Restore experiences to collector buffer if available
+        if (stats.experiences > 0 && collector) {
+            const experiences = await persistence.loadExperiences();
+            collector.explorationBuffer.buffer = experiences;
+            collector.explorationBuffer.totalExperiences = experiences.length;
+            console.log(`[Persistence] Restored ${experiences.length} experiences`);
+
+            // Update UI stats
+            updateStats({
+                experiences: experiences.length,
+            });
+        }
+
+        // Restore discoveries
+        if (stats.discoveries > 0) {
+            const discoveries = await persistence.loadDiscoveries();
+            console.log(`[Persistence] Restored ${discoveries.length} discoveries`);
+            // Could update the feed store here if needed
+        }
+
+        return stats;
+    } catch (e) {
+        console.error('[Persistence] Failed to restore data:', e);
+        return null;
+    }
+}
+
 /**
  * Initialize all game systems
  * @param {ArrayBuffer} romBuffer - ROM file data
@@ -104,11 +202,19 @@ export async function initializeGame(romBuffer, gameCanvas) {
         );
         autoTrainerStore.set(autoTrainerInstance);
 
-        // 8. Start emulator
+        // 8. Initialize persistence and restore data
+        await persistence.initDB();
+        setupPersistence();
+        const restoredStats = await restorePersistedData();
+        if (restoredStats?.experiences > 0) {
+            feedSystem(`Restored ${restoredStats.experiences} experiences from previous session.`);
+        }
+
+        // 9. Start emulator
         emu.frameCallback = updateGameStateFromMemory;
         emu.start();
 
-        // 9. Mark as loaded
+        // 10. Mark as loaded
         romLoaded.set(true);
 
         feedSystem('Game loaded! Select a mode to begin.');
@@ -423,4 +529,53 @@ export async function exportModel() {
 export function exportDiscoveries() {
     if (!rewardSystem) return null;
     return rewardSystem.exportData();
+}
+
+// ============ PERSISTENCE ============
+
+/**
+ * Export all data (full backup)
+ */
+export async function exportAllData() {
+    await flushExperiences(); // Save any pending first
+    return persistence.exportAllData();
+}
+
+/**
+ * Import all data (restore backup)
+ */
+export async function importAllData(data) {
+    const result = await persistence.importAllData(data);
+    if (result && collector) {
+        // Reload experiences into memory
+        const experiences = await persistence.loadExperiences();
+        collector.explorationBuffer.buffer = experiences;
+        collector.explorationBuffer.totalExperiences = experiences.length;
+        updateStats({ experiences: experiences.length });
+        feedSystem(`Imported ${experiences.length} experiences.`);
+    }
+    return result;
+}
+
+/**
+ * Get storage statistics
+ */
+export async function getStorageStats() {
+    return persistence.getStorageStats();
+}
+
+/**
+ * Clear all persisted data (factory reset)
+ */
+export async function clearAllData() {
+    if (confirm('This will delete all saved experiences, discoveries, and training data. Are you sure?')) {
+        await persistence.clearAllData();
+        if (collector) {
+            collector.explorationBuffer.clear();
+        }
+        updateStats({ experiences: 0 });
+        feedSystem('All data cleared.');
+        return true;
+    }
+    return false;
 }

@@ -1,11 +1,11 @@
 <script>
     import { activeMode } from '$lib/stores/agent';
-    import { startWatchMode, startTrainMode, stopAll } from '$lib/core/game-init.js';
-    import { Bot, Brain, Gamepad2, Square } from 'lucide-svelte';
+    import { startWatchMode, stopAll } from '$lib/core/game-init.js';
+    import { Bot, Gamepad2, Square } from 'lucide-svelte';
+    import PotionProgress from './PotionProgress.svelte';
 
     const modes = [
         { id: 'watch', label: 'Watch AI', icon: Bot },
-        { id: 'train', label: 'Train', icon: Brain },
         { id: 'manual', label: 'Play', icon: Gamepad2 },
     ];
 
@@ -21,8 +21,6 @@
 
             if (mode === 'watch') {
                 startWatchMode();
-            } else if (mode === 'train') {
-                startTrainMode();
             }
             // Manual mode doesn't need to start anything
         }
@@ -35,12 +33,13 @@
 </script>
 
 <div class="mode-selector panel">
+    <PotionProgress />
+
     <div class="mode-group">
         {#each modes as mode}
             <button
                 class="mode-btn"
                 class:active={$activeMode === mode.id}
-                class:training={mode.id === 'train' && $activeMode === 'train'}
                 on:click={() => selectMode(mode.id)}
             >
                 <svelte:component this={mode.icon} size={16} />
@@ -61,7 +60,7 @@
     .mode-selector {
         display: flex;
         align-items: center;
-        gap: 12px;
+        gap: 16px;
     }
 
     .mode-group {
@@ -83,6 +82,9 @@
         background: var(--accent-secondary);
         color: white;
         padding: 10px 20px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
     }
 
     .stop-btn:hover {
