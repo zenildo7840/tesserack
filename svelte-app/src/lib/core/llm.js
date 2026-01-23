@@ -1,5 +1,6 @@
 // llm.js - WebLLM wrapper
 import * as webllm from '@mlc-ai/web-llm';
+import { recordTokenUsage } from '../stores/llm.js';
 
 let engine = null;
 
@@ -36,11 +37,20 @@ export async function chat(systemPrompt, history = [], userMessage, maxTokens = 
         { role: 'user', content: userMessage }
     ];
 
+    const startTime = performance.now();
+
     const response = await engine.chat.completions.create({
         messages,
         max_tokens: maxTokens,
         temperature: 0.7,
     });
+
+    const duration = performance.now() - startTime;
+
+    // Record token usage stats
+    if (response.usage) {
+        recordTokenUsage(response.usage, duration);
+    }
 
     return response.choices[0].message.content;
 }
@@ -51,11 +61,19 @@ export async function generate(prompt, maxTokens = 256) {
         throw new Error('LLM not initialized');
     }
 
+    const startTime = performance.now();
+
     const response = await engine.chat.completions.create({
         messages: [{ role: 'user', content: prompt }],
         max_tokens: maxTokens,
         temperature: 0.7,
     });
+
+    const duration = performance.now() - startTime;
+
+    if (response.usage) {
+        recordTokenUsage(response.usage, duration);
+    }
 
     return response.choices[0].message.content;
 }

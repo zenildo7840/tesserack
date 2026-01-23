@@ -1,9 +1,12 @@
 <script>
     import { modelState } from '$lib/stores/training';
     import { romLoaded } from '$lib/stores/game';
-    import { Cpu, CheckCircle, Info, Github, ChevronDown, ChevronUp, X } from 'lucide-svelte';
+    import { llmState, tokenStats } from '$lib/stores/llm';
+    import { Cpu, CheckCircle, Info, Github, ChevronDown, ChevronUp, X, Zap } from 'lucide-svelte';
 
     let aboutOpen = false;
+
+    $: hasTokenStats = $tokenStats.requestCount > 0;
 </script>
 
 <header class="header">
@@ -27,6 +30,14 @@
                 <ChevronDown size={14} />
             {/if}
         </button>
+
+        {#if hasTokenStats}
+            <div class="token-stats" title="Total: {$tokenStats.totalTokens.toLocaleString()} tokens across {$tokenStats.requestCount} requests">
+                <Zap size={12} />
+                <span class="tps">{$tokenStats.lastTokensPerSecond} tok/s</span>
+                <span class="total">{($tokenStats.totalTokens / 1000).toFixed(1)}k</span>
+            </div>
+        {/if}
 
         {#if $romLoaded}
             {#if $modelState.hasModel}
@@ -171,6 +182,33 @@
         background: var(--bg-input);
         color: var(--text-secondary);
         border: 1px solid var(--border-color);
+    }
+
+    .token-stats {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 12px;
+        background: var(--bg-input);
+        border-radius: 6px;
+        font-size: 12px;
+        color: var(--text-secondary);
+        font-family: monospace;
+    }
+
+    .token-stats :global(svg) {
+        color: var(--accent-primary);
+    }
+
+    .token-stats .tps {
+        color: var(--text-primary);
+        font-weight: 600;
+    }
+
+    .token-stats .total {
+        color: var(--text-muted);
+        padding-left: 8px;
+        border-left: 1px solid var(--border-color);
     }
 
     .about-panel {
