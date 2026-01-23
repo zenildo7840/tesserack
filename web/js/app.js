@@ -6,6 +6,7 @@ import { GameAgent } from './agent.js';
 import { RLAgent } from './rl-agent.js';
 import { DataCollector } from './data-collector.js';
 import { CombinedRewardSystem } from './adaptive-rewards.js';
+import { TrainedPolicy, AutoTrainingManager } from './trained-policy.js';
 import { saveState, loadState, hasSavedState } from './storage.js';
 
 console.log('Tesserack loading...');
@@ -66,6 +67,19 @@ const currentTestsDiv = document.getElementById('current-tests');
 const testsPassedSpan = document.getElementById('tests-passed');
 const adaptiveRewardSpan = document.getElementById('adaptive-reward');
 
+// Training panel elements
+const trainingPanel = document.getElementById('training-panel');
+const modelStatusSpan = document.getElementById('model-status');
+const trainingSessionsSpan = document.getElementById('training-sessions');
+const policyUsageSpan = document.getElementById('policy-usage');
+const nextAutotrainSpan = document.getElementById('next-autotrain');
+const trainingProgress = document.getElementById('training-progress');
+const trainingLabel = document.getElementById('training-label');
+const trainingBarFill = document.getElementById('training-bar-fill');
+const trainNowBtn = document.getElementById('train-now-btn');
+const clearModelBtn = document.getElementById('clear-model-btn');
+const autoTrainToggle = document.getElementById('auto-train-toggle');
+
 // Manual control buttons
 const manualButtons = document.querySelectorAll('[data-btn]');
 const turboABtn = document.getElementById('turbo-a-btn');
@@ -87,6 +101,9 @@ let activeAgent = null;  // Currently running agent
 let memoryReader = null;
 let rewardSystem = null;  // Combined adaptive reward system
 let pendingCheckpointImage = null;  // For manual checkpoint creation
+let trainedPolicy = null;  // Neural network policy
+let autoTrainer = null;  // Auto-training manager
+let autoTrainEnabled = true;  // Whether auto-training is enabled
 
 // Initialize AI model
 async function initializeAI() {
@@ -283,6 +300,27 @@ async function loadROM(file) {
         if (rlAgent && rewardSystem) {
             rlAgent.setExternalRewardSource(rewardSystem);
         }
+
+        // Initialize trained policy and auto-trainer
+        trainedPolicy = new TrainedPolicy(handlePolicyStatusChange);
+        await trainedPolicy.initialize();  // Load existing model if available
+
+        // Connect trained policy to RL agent
+        if (rlAgent) {
+            rlAgent.setTrainedPolicy(trainedPolicy);
+        }
+
+        // Set up auto-training manager with data collector's buffer
+        autoTrainer = new AutoTrainingManager(
+            dataCollector.explorationBuffer,
+            trainedPolicy,
+            handleAutoTrainEvent
+        );
+
+        // Enable training buttons
+        trainNowBtn.disabled = false;
+        clearModelBtn.disabled = false;
+        updateTrainingPanelUI();
 
         // Start emulator display loop
         emulator.start();
@@ -848,6 +886,151 @@ importCheckpointsInput.addEventListener('change', (e) => {
 const originalRlBtnHandler = rlBtn.onclick;
 rlBtn.addEventListener('click', () => {
     adaptivePanel.style.display = 'block';
+});
+
+// ===== NEURAL NETWORK TRAINING SYSTEM =====
+
+// Handle policy status changes
+function handlePolicyStatusChange(status) {
+    updateTrainingPanelUI();
+
+    // Handle training progress updates
+    if (status.trainingProgress) {
+        const progress = status.trainingProgress;
+
+        if (progress.stage === 'loading' || progress.stage === 'preparing') {
+            trainingProgress.style.display = 'block';
+            trainingLabel.textContent = progress.message;
+            trainingBarFill.style.width = '10%';
+            trainingPanel.classList.add('training');
+        } else if (progress.stage === 'training') {
+            trainingProgress.style.display = 'block';
+            const pct = ((progress.epoch / progress.totalEpochs) * 100).toFixed(0);
+            trainingLabel.textContent = `${progress.message} - Loss: ${progress.loss?.toFixed(4) || '?'}`;
+            trainingBarFill.style.width = `${pct}%`;
+        } else if (progress.stage === 'saving') {
+            trainingLabel.textContent = progress.message;
+            trainingBarFill.style.width = '95%';
+        } else if (progress.stage === 'complete') {
+            trainingProgress.style.display = 'none';
+            trainingPanel.classList.remove('training');
+            trainingPanel.classList.add('has-model');
+            statusText.textContent = progress.message;
+        } else if (progress.stage === 'error') {
+            trainingProgress.style.display = 'none';
+            trainingPanel.classList.remove('training');
+            statusText.textContent = progress.message;
+        }
+    }
+}
+
+// Handle auto-training events
+function handleAutoTrainEvent(event) {
+    if (event.type === 'training-starting') {
+        statusText.textContent = `Auto-training starting (${event.experienceCount} experiences)...`;
+        // Pause data collection during training
+        if (dataCollector?.running) {
+            dataCollector.stop();
+        }
+    } else if (event.type === 'training-complete') {
+        statusText.textContent = `Auto-training complete! Model improved.`;
+        updateTrainingPanelUI();
+    }
+}
+
+// Update training panel UI
+function updateTrainingPanelUI() {
+    if (!trainedPolicy) return;
+
+    const status = trainedPolicy.getStatus();
+
+    // Model status
+    if (status.hasModel) {
+        modelStatusSpan.textContent = `Trained (${status.trainingSessions} sessions)`;
+        modelStatusSpan.style.color = '#2ecc71';
+        trainingPanel.classList.add('has-model');
+    } else {
+        modelStatusSpan.textContent = 'Not trained';
+        modelStatusSpan.style.color = '#e74c3c';
+        trainingPanel.classList.remove('has-model');
+    }
+
+    // Training sessions
+    trainingSessionsSpan.textContent = status.trainingSessions;
+
+    // Policy usage rate
+    policyUsageSpan.textContent = `${status.predictionRate}%`;
+
+    // Next auto-train threshold
+    if (status.nextAutoTrain === 'done') {
+        nextAutotrainSpan.textContent = 'Max reached';
+    } else {
+        nextAutotrainSpan.textContent = status.nextAutoTrain.toLocaleString();
+    }
+}
+
+// Train Now button
+trainNowBtn.addEventListener('click', async () => {
+    if (!trainedPolicy || !dataCollector) return;
+
+    const experiences = [
+        ...dataCollector.explorationBuffer.buffer,
+        ...dataCollector.humanBuffer.buffer
+    ];
+
+    if (experiences.length < 100) {
+        statusText.textContent = 'Need at least 100 experiences to train. Collect more data first!';
+        return;
+    }
+
+    trainNowBtn.disabled = true;
+    statusText.textContent = 'Starting training...';
+
+    try {
+        await trainedPolicy.trainNow(experiences, { epochs: 30 });
+    } finally {
+        trainNowBtn.disabled = false;
+    }
+});
+
+// Clear Model button
+clearModelBtn.addEventListener('click', async () => {
+    if (!trainedPolicy) return;
+
+    if (confirm('Clear the trained model? You will need to train again.')) {
+        await trainedPolicy.clearModel();
+        updateTrainingPanelUI();
+        statusText.textContent = 'Model cleared.';
+    }
+});
+
+// Auto-train toggle
+autoTrainToggle.addEventListener('change', (e) => {
+    autoTrainEnabled = e.target.checked;
+
+    if (autoTrainEnabled && autoTrainer) {
+        autoTrainer.startMonitoring();
+        statusText.textContent = 'Auto-training enabled';
+    } else if (autoTrainer) {
+        autoTrainer.stopMonitoring();
+        statusText.textContent = 'Auto-training disabled';
+    }
+});
+
+// Start auto-training monitor when exploration starts
+const originalExploreHandler = exploreBtn.onclick;
+exploreBtn.addEventListener('click', () => {
+    if (autoTrainEnabled && autoTrainer) {
+        autoTrainer.startMonitoring(15000);  // Check every 15 seconds
+    }
+});
+
+// Stop auto-training monitor when collection stops
+const originalStopCollectHandler = stopCollectBtn.onclick;
+stopCollectBtn.addEventListener('click', () => {
+    if (autoTrainer) {
+        autoTrainer.stopMonitoring();
+    }
 });
 
 console.log('Tesserack ready');

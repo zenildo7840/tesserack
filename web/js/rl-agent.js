@@ -116,6 +116,9 @@ export class RLAgent {
 
         // Optional external reward source (e.g., CombinedRewardSystem)
         this.externalRewardSource = null;
+
+        // Trained neural network policy
+        this.trainedPolicy = null;
     }
 
     /**
@@ -124,6 +127,15 @@ export class RLAgent {
      */
     setExternalRewardSource(source) {
         this.externalRewardSource = source;
+    }
+
+    /**
+     * Set the trained neural network policy
+     * @param {TrainedPolicy} policy - Trained policy instance
+     */
+    setTrainedPolicy(policy) {
+        this.trainedPolicy = policy;
+        console.log('Trained policy connected to RL agent');
     }
 
     /**
@@ -165,7 +177,7 @@ export class RLAgent {
     }
 
     /**
-     * Select best plan using RL policy
+     * Select best plan using RL policy (neural network + action stats + heuristics)
      * @param {Object[]} plans - Candidate plans from LLM
      * @param {Object} state - Current game state
      * @returns {Object} - Selected plan
@@ -185,32 +197,66 @@ export class RLAgent {
             return { ...plans[idx], selected: 'exploration' };
         }
 
-        // Exploitation: use action statistics to score plans
-        if (this.useActionStats) {
-            const location = state.location;
-            const scoredPlans = plans.map(p => ({
-                ...p,
-                score: this.actionStats.getActionScore(location, p.actions) +
-                    this.computeHeuristicScore(p, state),
-            }));
+        // Convert state for trained policy
+        const policyState = {
+            x: state.coordinates?.x || 0,
+            y: state.coordinates?.y || 0,
+            mapId: state.mapId || 0,
+            badgeCount: state.badges?.length || 0,
+            partyCount: state.party?.length || 0,
+            avgLevel: state.party?.length > 0
+                ? state.party.reduce((sum, p) => sum + p.level, 0) / state.party.length
+                : 0,
+            hpRatio: state.party?.length > 0
+                ? state.party.reduce((sum, p) => sum + (p.currentHP / p.maxHP), 0) / state.party.length
+                : 1,
+            inBattle: state.inBattle || false,
+            hasDialog: !!(state.dialog?.trim()),
+            money: state.money || 0
+        };
 
-            // Softmax selection (higher scores more likely)
-            const temperature = 0.5;
-            const expScores = scoredPlans.map(p => Math.exp(p.score / temperature));
-            const sumExp = expScores.reduce((a, b) => a + b, 0);
-            const probs = expScores.map(e => e / sumExp);
+        // Score plans using all available methods
+        const location = state.location;
+        const scoredPlans = plans.map(p => {
+            let score = 0;
 
-            let rand = Math.random();
-            for (let i = 0; i < probs.length; i++) {
-                rand -= probs[i];
-                if (rand <= 0) {
-                    return { ...scoredPlans[i], selected: 'policy' };
-                }
+            // 1. Neural network policy score (highest weight if available)
+            if (this.trainedPolicy) {
+                const policyScore = this.trainedPolicy.scorePlan(policyState, p.actions);
+                score += policyScore * 3;  // Weight neural network heavily
+            }
+
+            // 2. Action statistics score
+            if (this.useActionStats) {
+                score += this.actionStats.getActionScore(location, p.actions);
+            }
+
+            // 3. Heuristic score
+            score += this.computeHeuristicScore(p, state);
+
+            return { ...p, score };
+        });
+
+        // Softmax selection (higher scores more likely)
+        const temperature = 0.5;
+        const expScores = scoredPlans.map(p => Math.exp(p.score / temperature));
+        const sumExp = expScores.reduce((a, b) => a + b, 0);
+        const probs = expScores.map(e => e / sumExp);
+
+        let rand = Math.random();
+        for (let i = 0; i < probs.length; i++) {
+            rand -= probs[i];
+            if (rand <= 0) {
+                const selectedBy = this.trainedPolicy?.trainer?.model
+                    ? 'neural-policy'
+                    : 'action-stats';
+                return { ...scoredPlans[i], selected: selectedBy };
             }
         }
 
-        // Default: first plan
-        return { ...plans[0], selected: 'default' };
+        // Default: highest score
+        scoredPlans.sort((a, b) => b.score - a.score);
+        return { ...scoredPlans[0], selected: 'default' };
     }
 
     /**

@@ -90,6 +90,30 @@
                     </div>
                 </div>
 
+                <div class="training-panel" id="training-panel">
+                    <h3>Neural Network</h3>
+                    <div class="training-stats">
+                        <div><strong>Model:</strong> <span id="model-status">Not trained</span></div>
+                        <div><strong>Sessions:</strong> <span id="training-sessions">0</span></div>
+                        <div><strong>Policy Usage:</strong> <span id="policy-usage">0%</span></div>
+                        <div><strong>Next Auto-Train:</strong> <span id="next-autotrain">3,000</span> steps</div>
+                    </div>
+                    <div id="training-progress" class="training-progress" style="display:none">
+                        <div class="progress-label" id="training-label">Training...</div>
+                        <div class="training-bar">
+                            <div class="training-bar-fill" id="training-bar-fill"></div>
+                        </div>
+                    </div>
+                    <div class="training-controls">
+                        <button id="train-now-btn" disabled>Train Now</button>
+                        <button id="clear-model-btn" disabled>Clear Model</button>
+                        <label class="toggle-label">
+                            <input type="checkbox" id="auto-train-toggle" checked>
+                            Auto-train
+                        </label>
+                    </div>
+                </div>
+
                 <div class="data-panel">
                     <h3>Data Collection</h3>
                     <div class="data-controls">
