@@ -8,12 +8,14 @@ export function saveState(emulator) {
         const state = emulator.saveState();
         console.log('Got state, size:', state.length);
 
-        // Convert Uint8Array to base64 without spread operator (avoids stack overflow for large arrays)
-        let binary = '';
-        const len = state.length;
-        for (let i = 0; i < len; i++) {
-            binary += String.fromCharCode(state[i]);
+        // Convert Uint8Array to base64 using chunks to avoid stack overflow
+        const CHUNK_SIZE = 0x8000; // 32KB chunks
+        const chunks = [];
+        for (let i = 0; i < state.length; i += CHUNK_SIZE) {
+            const chunk = state.subarray(i, i + CHUNK_SIZE);
+            chunks.push(String.fromCharCode.apply(null, chunk));
         }
+        const binary = chunks.join('');
         const encoded = btoa(binary);
         console.log('Encoded size:', encoded.length);
 
