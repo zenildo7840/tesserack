@@ -331,16 +331,24 @@ export class Emulator {
      * @returns {Uint8Array} - State data
      */
     saveState() {
+        if (!this.e) {
+            throw new Error('Emulator not initialized');
+        }
+
         const fileDataPtr = this.module._state_file_data_new(this.e);
+        if (!fileDataPtr) {
+            throw new Error('Failed to create state file data');
+        }
+
         const dataPtr = this.module._get_file_data_ptr(fileDataPtr);
         const dataSize = this.module._get_file_data_size(fileDataPtr);
 
         // Write state to the file data buffer
         this.module._emulator_write_state(this.e, fileDataPtr);
 
-        // Copy the data
+        // Copy the data (use slice() to ensure we get a true copy, not a view)
         const buffer = makeWasmBuffer(this.module, dataPtr, dataSize);
-        const result = new Uint8Array(buffer);
+        const result = buffer.slice();
 
         // Clean up
         this.module._file_data_delete(fileDataPtr);
