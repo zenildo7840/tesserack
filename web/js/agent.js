@@ -1,27 +1,105 @@
 // agent.js - Game agent that coordinates LLM and emulator
-import { generate } from './llm.js';
+import { chat } from './llm.js';
 import { parseResponse } from './action-parser.js';
 
-const SYSTEM_PROMPT = `You are an AI playing Pokemon Red. Goal: become Pokemon Champion.
+const SYSTEM_PROMPT = `You are an expert AI playing Pokemon Red. Your ultimate goal is to become the Pokemon Champion.
 
-Given the game state, output your next 10 button presses.
-
-RULES:
+CONTROLS:
 - Valid buttons: up, down, left, right, a, b, start, select
-- Press 'a' to talk, confirm, or advance dialog
+- Press 'a' to talk, confirm, advance dialog, or select menu items
 - Press 'b' to cancel or go back
-- Use directions to move on the map
+- Use directions to move on the map or navigate menus
 - In battle: select moves with up/down, confirm with 'a'
 
 OUTPUT FORMAT (follow exactly):
-PLAN: <brief 1-line goal>
+PLAN: <brief 1-line explanation of your immediate goal>
 ACTIONS: button1, button2, button3, button4, button5, button6, button7, button8, button9, button10
 
 Example:
 PLAN: Walk right to exit room and talk to NPC
-ACTIONS: right, right, right, up, up, a, a, a, a, a
+ACTIONS: right, right, right, up, up, a, a, a, a, a`;
 
-Now analyze and respond:`;
+// Objective tracking based on game progress
+const OBJECTIVES = {
+    START: {
+        description: "Start your adventure: Get your first Pokemon from Professor Oak",
+        hint: "Go downstairs, leave house, try to enter tall grass. Oak will stop you and give you a Pokemon."
+    },
+    RIVAL_BATTLE_1: {
+        description: "Beat your rival in Oak's lab",
+        hint: "Use your starter's moves (Tackle/Scratch) to defeat rival's Pokemon."
+    },
+    OAKS_PARCEL: {
+        description: "Deliver Oak's Parcel from Viridian City",
+        hint: "Go north to Route 1, then to Viridian City. Visit the Poke Mart to get the parcel."
+    },
+    BOULDER_BADGE: {
+        description: "Defeat Brock and earn the Boulder Badge",
+        hint: "Train on Route 22 and Viridian Forest. Brock uses Rock types - use Water or Grass moves."
+    },
+    CASCADE_BADGE: {
+        description: "Defeat Misty and earn the Cascade Badge",
+        hint: "Go through Mt. Moon to Cerulean City. Misty uses Water types - use Electric or Grass."
+    },
+    THUNDER_BADGE: {
+        description: "Defeat Lt. Surge and earn the Thunder Badge",
+        hint: "Go to Vermilion City via Nugget Bridge and Route 5-6. Surge uses Electric - use Ground types."
+    },
+    RAINBOW_BADGE: {
+        description: "Defeat Erika and earn the Rainbow Badge",
+        hint: "In Celadon City. Erika uses Grass types - use Fire, Flying, or Ice moves."
+    },
+    SOUL_BADGE: {
+        description: "Defeat Koga and earn the Soul Badge",
+        hint: "In Fuchsia City. Koga uses Poison types - use Ground or Psychic moves."
+    },
+    MARSH_BADGE: {
+        description: "Defeat Sabrina and earn the Marsh Badge",
+        hint: "In Saffron City (need Silph Scope first). Sabrina uses Psychic - use Bug or Ghost."
+    },
+    VOLCANO_BADGE: {
+        description: "Defeat Blaine and earn the Volcano Badge",
+        hint: "On Cinnabar Island. Blaine uses Fire types - use Water, Ground, or Rock."
+    },
+    EARTH_BADGE: {
+        description: "Defeat Giovanni and earn the Earth Badge",
+        hint: "In Viridian City. Giovanni uses Ground types - use Water, Grass, or Ice."
+    },
+    POKEMON_LEAGUE: {
+        description: "Defeat the Elite Four and become Champion",
+        hint: "Victory Road to Indigo Plateau. Face Lorelei (Ice), Bruno (Fighting), Agatha (Ghost), Lance (Dragon), then Champion."
+    }
+};
+
+function getObjective(state) {
+    const badgeCount = state.badges.length;
+    const location = state.location;
+
+    // Check based on badge count
+    if (badgeCount === 0) {
+        // Early game checks
+        if (state.party.length === 0) {
+            return OBJECTIVES.START;
+        }
+        if (location.includes('OAK')) {
+            return OBJECTIVES.RIVAL_BATTLE_1;
+        }
+        // Check if we have Oaks Parcel
+        const hasParcel = state.items.some(item => item.name === 'OAKS PARCEL');
+        if (hasParcel || location === 'VIRIDIAN CITY' || location === 'ROUTE 1') {
+            return OBJECTIVES.OAKS_PARCEL;
+        }
+        return OBJECTIVES.BOULDER_BADGE;
+    }
+    if (badgeCount === 1) return OBJECTIVES.CASCADE_BADGE;
+    if (badgeCount === 2) return OBJECTIVES.THUNDER_BADGE;
+    if (badgeCount === 3) return OBJECTIVES.RAINBOW_BADGE;
+    if (badgeCount === 4) return OBJECTIVES.SOUL_BADGE;
+    if (badgeCount === 5) return OBJECTIVES.MARSH_BADGE;
+    if (badgeCount === 6) return OBJECTIVES.VOLCANO_BADGE;
+    if (badgeCount === 7) return OBJECTIVES.EARTH_BADGE;
+    return OBJECTIVES.POKEMON_LEAGUE;
+}
 
 export class GameAgent {
     constructor(emulator, memoryReader, onUpdate) {
@@ -33,22 +111,78 @@ export class GameAgent {
         this.manualOverrideUntil = 0;
         this.stepCount = 0;
         this.actionQueue = [];
+        // Conversation history for context (last 10 exchanges)
+        this.history = [];
+        this.maxHistoryLength = 10;
     }
 
-    buildPrompt(state) {
-        const lines = [SYSTEM_PROMPT, '', 'CURRENT GAME STATE:'];
+    /**
+     * Add an exchange to conversation history
+     * @param {string} userMessage - The game state message sent
+     * @param {string} assistantResponse - The LLM's response
+     */
+    addToHistory(userMessage, assistantResponse) {
+        this.history.push(
+            { role: 'user', content: userMessage },
+            { role: 'assistant', content: assistantResponse }
+        );
+        // Keep only last N exchanges (2 messages per exchange)
+        while (this.history.length > this.maxHistoryLength * 2) {
+            this.history.shift();
+            this.history.shift();
+        }
+    }
 
+    /**
+     * Build the user message with current game state
+     * @param {Object} state - Game state from memory reader
+     * @returns {string}
+     */
+    buildUserMessage(state) {
+        const objective = getObjective(state);
+        const lines = [];
+
+        // Current objective
+        lines.push(`CURRENT OBJECTIVE: ${objective.description}`);
+        lines.push(`HINT: ${objective.hint}`);
+        lines.push('');
+
+        // Game state
+        lines.push('GAME STATE:');
         lines.push(`Location: ${state.location}`);
         lines.push(`Coordinates: (${state.coordinates.x}, ${state.coordinates.y})`);
         lines.push(`Money: $${state.money}`);
-        lines.push(`Badges: ${state.badges.length > 0 ? state.badges.join(', ') : 'None'}`);
+        lines.push(`Badges: ${state.badges.length > 0 ? state.badges.join(', ') : 'None'} (${state.badges.length}/8)`);
 
-        lines.push('', 'POKEMON PARTY:');
-        for (const p of state.party) {
-            lines.push(`  ${p.species} Lv.${p.level} HP:${p.currentHP}/${p.maxHP}`);
+        // Party info
+        lines.push('');
+        lines.push('PARTY:');
+        if (state.party.length > 0) {
+            for (const p of state.party) {
+                const status = p.status !== 'OK' ? ` [${p.status}]` : '';
+                lines.push(`  ${p.species} Lv.${p.level} HP:${p.currentHP}/${p.maxHP}${status}`);
+                if (p.moves.length > 0) {
+                    lines.push(`    Moves: ${p.moves.join(', ')}`);
+                }
+            }
+        } else {
+            lines.push('  (No Pokemon yet)');
         }
 
-        lines.push('', 'PLAN:');
+        // Battle state
+        if (state.inBattle) {
+            lines.push('');
+            lines.push('[IN BATTLE]');
+        }
+
+        // Dialog text if present
+        if (state.dialog && state.dialog.trim().length > 0) {
+            lines.push('');
+            lines.push(`DIALOG: "${state.dialog}"`);
+        }
+
+        lines.push('');
+        lines.push('What are your next 10 actions?');
 
         return lines.join('\n');
     }
@@ -71,7 +205,7 @@ export class GameAgent {
             if (this.onUpdate) {
                 this.onUpdate({
                     action: [action],
-                    reasoning: `Executing queued action ${this.actionQueue.length + 1} remaining`,
+                    reasoning: `Executing queued action (${this.actionQueue.length} remaining)`,
                     state: this.reader.getGameState()
                 });
             }
@@ -80,11 +214,16 @@ export class GameAgent {
 
         // Get new actions from LLM
         const state = this.reader.getGameState();
-        const prompt = this.buildPrompt(state);
+        const userMessage = this.buildUserMessage(state);
+        const objective = getObjective(state);
 
         try {
-            const response = await generate(prompt);
+            // Use chat() with system prompt, history, and current state
+            const response = await chat(SYSTEM_PROMPT, this.history, userMessage, 256);
             const { plan, actions } = parseResponse(response);
+
+            // Add to conversation history
+            this.addToHistory(userMessage, response);
 
             // Queue all actions
             this.actionQueue = [...actions];
@@ -93,6 +232,7 @@ export class GameAgent {
                 this.onUpdate({
                     action: actions,
                     reasoning: plan,
+                    objective: objective.description,
                     state
                 });
             }
@@ -155,6 +295,22 @@ export class GameAgent {
         this.running = false;
         this.turboMode = false;
         this.actionQueue = [];
+    }
+
+    /**
+     * Clear conversation history (useful when game context changes significantly)
+     */
+    clearHistory() {
+        this.history = [];
+    }
+
+    /**
+     * Get current objective based on game state
+     * @returns {Object} - {description, hint}
+     */
+    getCurrentObjective() {
+        const state = this.reader.getGameState();
+        return getObjective(state);
     }
 
     manualButton(button) {

@@ -17,6 +17,35 @@ export async function initLLM(onProgress) {
     return engine;
 }
 
+/**
+ * Generate a response using conversation format with system message
+ * @param {string} systemPrompt - System instructions
+ * @param {Array} history - Array of {role, content} messages
+ * @param {string} userMessage - Current user message
+ * @param {number} maxTokens - Max tokens to generate
+ * @returns {Promise<string>}
+ */
+export async function chat(systemPrompt, history = [], userMessage, maxTokens = 256) {
+    if (!engine) {
+        throw new Error('LLM not initialized');
+    }
+
+    const messages = [
+        { role: 'system', content: systemPrompt },
+        ...history,
+        { role: 'user', content: userMessage }
+    ];
+
+    const response = await engine.chat.completions.create({
+        messages,
+        max_tokens: maxTokens,
+        temperature: 0.7,
+    });
+
+    return response.choices[0].message.content;
+}
+
+// Legacy function for backwards compatibility
 export async function generate(prompt, maxTokens = 256) {
     if (!engine) {
         throw new Error('LLM not initialized');
