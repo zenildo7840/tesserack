@@ -1,8 +1,9 @@
-// app.js - Final version - Main entry point for Tesserack
+// app.js - Main entry point for Tesserack
 import { Emulator } from './emulator.js';
 import { MemoryReader } from './memory-reader.js';
 import { initLLM, isReady } from './llm.js';
 import { GameAgent } from './agent.js';
+import { RLAgent } from './rl-agent.js';
 import { saveState, loadState, hasSavedState } from './storage.js';
 
 console.log('Tesserack loading...');
@@ -14,10 +15,20 @@ const gameCanvas = document.getElementById('game-canvas');
 const statusText = document.getElementById('status-text');
 const turboBtn = document.getElementById('turbo-btn');
 const llmBtn = document.getElementById('llm-btn');
+const rlBtn = document.getElementById('rl-btn');
 const stopBtn = document.getElementById('stop-btn');
 const saveBtn = document.getElementById('save-btn');
 const loadBtn = document.getElementById('load-btn');
 const gameStateDiv = document.getElementById('game-state');
+
+// RL panel elements
+const rlPanel = document.getElementById('rl-panel');
+const rlRewardSpan = document.getElementById('rl-reward');
+const rlExperiencesSpan = document.getElementById('rl-experiences');
+const rlMapsSpan = document.getElementById('rl-maps');
+const rlExplorationSpan = document.getElementById('rl-exploration');
+const explorationSlider = document.getElementById('exploration-slider');
+const exportRlBtn = document.getElementById('export-rl-btn');
 
 // Manual control buttons
 const manualButtons = document.querySelectorAll('[data-btn]');
@@ -34,6 +45,8 @@ let emulator = null;
 let turboAInterval = null;
 let llmInitialized = false;
 let agent = null;
+let rlAgent = null;
+let activeAgent = null;  // Currently running agent
 let memoryReader = null;
 
 // Initialize AI model
@@ -54,8 +67,9 @@ async function initializeAI() {
         });
 
         progressContainer.style.display = 'none';
-        statusText.textContent = 'Ready! Click Turbo or LLM to start.';
+        statusText.textContent = 'Ready! Click Turbo, LLM, or RL+LLM to start.';
         llmBtn.disabled = false;
+        rlBtn.disabled = false;
         llmInitialized = true;
     } catch (err) {
         progressContainer.style.display = 'none';
@@ -83,6 +97,27 @@ function handleAgentUpdate(update) {
     } else {
         hintStatus.textContent = '';
         hintStatus.classList.remove('active');
+    }
+
+    // Update RL stats if available
+    if (update.rlStats) {
+        updateRLStats(update.rlStats);
+    }
+}
+
+// Update RL statistics display
+function updateRLStats(stats) {
+    if (rlRewardSpan) {
+        rlRewardSpan.textContent = Math.round(stats.reward?.totalReward || 0);
+    }
+    if (rlExperiencesSpan) {
+        rlExperiencesSpan.textContent = stats.buffer?.size || 0;
+    }
+    if (rlMapsSpan) {
+        rlMapsSpan.textContent = stats.reward?.visitedMaps || 0;
+    }
+    if (rlExplorationSpan) {
+        rlExplorationSpan.textContent = `${Math.round((stats.explorationRate || 0.2) * 100)}%`;
     }
 }
 
@@ -145,9 +180,10 @@ async function loadROM(file) {
         // Set up frame callback to update game state display
         emulator.frameCallback = updateGameStateDisplay;
 
-        // Initialize memory reader and agent
+        // Initialize memory reader and agents
         memoryReader = new MemoryReader(emulator);
         agent = new GameAgent(emulator, memoryReader, handleAgentUpdate);
+        rlAgent = new RLAgent(emulator, memoryReader, handleAgentUpdate);
 
         // Start emulator display loop
         emulator.start();
@@ -195,30 +231,57 @@ function updateGameStateDisplay() {
 // Button handlers
 turboBtn.addEventListener('click', () => {
     if (agent) {
+        activeAgent = agent;
         agent.runTurbo();
         turboBtn.disabled = true;
         llmBtn.disabled = true;
+        rlBtn.disabled = true;
         stopBtn.disabled = false;
+        rlPanel.style.display = 'none';
         statusText.textContent = 'Turbo mode running...';
     }
 });
 
 llmBtn.addEventListener('click', () => {
     if (agent) {
+        activeAgent = agent;
         agent.runLLM();
         turboBtn.disabled = true;
         llmBtn.disabled = true;
+        rlBtn.disabled = true;
         stopBtn.disabled = false;
+        rlPanel.style.display = 'none';
         statusText.textContent = 'LLM mode running...';
     }
 });
 
+rlBtn.addEventListener('click', () => {
+    if (rlAgent) {
+        activeAgent = rlAgent;
+        rlAgent.run();
+        turboBtn.disabled = true;
+        llmBtn.disabled = true;
+        rlBtn.disabled = true;
+        stopBtn.disabled = false;
+        rlPanel.style.display = 'block';
+        statusText.textContent = 'RL+LLM mode running...';
+    }
+});
+
 stopBtn.addEventListener('click', () => {
+    if (activeAgent) {
+        activeAgent.stop();
+        activeAgent = null;
+    }
     if (agent) {
         agent.stop();
     }
+    if (rlAgent) {
+        rlAgent.stop();
+    }
     turboBtn.disabled = false;
     llmBtn.disabled = !llmInitialized;
+    rlBtn.disabled = !llmInitialized;
     stopBtn.disabled = true;
     statusText.textContent = 'Stopped';
     // Stop turbo A if running
@@ -345,6 +408,29 @@ hintBtn.addEventListener('click', sendHint);
 hintInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') {
         sendHint();
+    }
+});
+
+// RL controls
+explorationSlider.addEventListener('input', (e) => {
+    const rate = parseInt(e.target.value) / 100;
+    if (rlAgent) {
+        rlAgent.setExplorationRate(rate);
+    }
+    rlExplorationSpan.textContent = `${e.target.value}%`;
+});
+
+exportRlBtn.addEventListener('click', () => {
+    if (rlAgent) {
+        const data = rlAgent.exportData();
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `tesserack-rl-data-${Date.now()}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+        statusText.textContent = 'RL data exported!';
     }
 });
 

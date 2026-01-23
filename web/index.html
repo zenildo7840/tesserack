@@ -41,9 +41,10 @@
             <div class="info-panel">
                 <div class="controls-row">
                     <div class="mode-select">
-                        <span class="mode-label">Start:</span>
-                        <button id="turbo-btn" class="mode-btn primary" disabled>▶ Turbo</button>
-                        <button id="llm-btn" class="mode-btn" disabled>▶ LLM</button>
+                        <span class="mode-label">Mode:</span>
+                        <button id="turbo-btn" class="mode-btn" disabled>Turbo</button>
+                        <button id="llm-btn" class="mode-btn" disabled>LLM</button>
+                        <button id="rl-btn" class="mode-btn primary" disabled>RL+LLM</button>
                     </div>
                     <button id="stop-btn" disabled>Stop</button>
                     <button id="save-btn" disabled>Save</button>
@@ -71,6 +72,22 @@
                         <button id="hint-btn" disabled>Send</button>
                     </div>
                     <div id="hint-status" class="hint-status"></div>
+                </div>
+
+                <div class="rl-panel" id="rl-panel" style="display:none">
+                    <h3>RL Stats</h3>
+                    <div class="rl-stats">
+                        <div><strong>Total Reward:</strong> <span id="rl-reward">0</span></div>
+                        <div><strong>Experiences:</strong> <span id="rl-experiences">0</span></div>
+                        <div><strong>Maps Visited:</strong> <span id="rl-maps">0</span></div>
+                        <div><strong>Exploration:</strong> <span id="rl-exploration">20%</span></div>
+                    </div>
+                    <div class="rl-controls">
+                        <label>Exploration Rate:
+                            <input type="range" id="exploration-slider" min="0" max="100" value="20">
+                        </label>
+                        <button id="export-rl-btn">Export Data</button>
+                    </div>
                 </div>
             </div>
         </main>
