@@ -12,11 +12,12 @@ CONTROLS:
 - In battle: select moves with up/down, confirm with 'a'
 
 IMPORTANT RULES:
-- Do NOT open the menu (start) unless you specifically need to use an item, check Pokemon, or save
-- Focus on MOVEMENT and INTERACTION - walk to destinations and talk to people
+- NEVER press 'start' or 'select' - the menu is disabled
+- Focus on MOVEMENT (up/down/left/right) and INTERACTION (a/b)
 - If dialog is showing, press 'a' repeatedly to advance it
-- Avoid random menu browsing - it wastes time
-- When stuck, try moving in different directions, not opening menus
+- If stuck in a menu, press 'b' repeatedly to exit
+- When stuck, try moving in different directions
+- Your actions should be mostly: movement keys + 'a' for interaction
 
 OUTPUT FORMAT (follow exactly):
 PLAN: <brief 1-line explanation of your immediate goal>
@@ -78,33 +79,42 @@ const OBJECTIVES = {
     }
 };
 
+// Global cooldown tracking for menu buttons
+let startCooldown = 0;
+const START_COOLDOWN_CALLS = 10; // Only allow start once every 10 LLM calls
+
 /**
  * Filter actions to reduce menu spam
  * @param {string[]} actions - Raw actions from LLM
+ * @param {boolean} inBattle - Whether currently in battle
  * @returns {string[]} - Filtered actions
  */
-function filterActions(actions) {
+function filterActions(actions, inBattle = false) {
     const filtered = [];
-    let startCount = 0;
-    let selectCount = 0;
 
     for (const action of actions) {
         const btn = action.toLowerCase();
 
-        // Limit start presses to max 1 per batch
+        // Block start almost entirely (unless in battle where it might be needed)
         if (btn === 'start') {
-            if (startCount >= 1) continue; // Skip extra start presses
-            startCount++;
+            if (!inBattle && startCooldown > 0) {
+                // Replace with 'b' to help escape menus
+                filtered.push('b');
+                continue;
+            }
+            startCooldown = START_COOLDOWN_CALLS;
         }
 
-        // Limit select presses (rarely needed)
+        // Block select entirely - almost never needed
         if (btn === 'select') {
-            if (selectCount >= 1) continue;
-            selectCount++;
+            continue;
         }
 
         filtered.push(action);
     }
+
+    // Decrement cooldown
+    if (startCooldown > 0) startCooldown--;
 
     return filtered;
 }
@@ -311,7 +321,7 @@ export class GameAgent {
             }
 
             // Filter out excessive menu actions and queue
-            this.actionQueue = filterActions(actions);
+            this.actionQueue = filterActions(actions, state.inBattle);
 
             if (this.onUpdate) {
                 this.onUpdate({
