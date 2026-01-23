@@ -1,5 +1,6 @@
 <script>
     import { onMount } from 'svelte';
+    import { Info } from 'lucide-svelte';
 
     // Components
     import Header from '$lib/components/Header.svelte';
@@ -56,6 +57,13 @@
     {#if $romLoaded}
         <AdvancedPanel />
     {/if}
+
+    <footer class="info-footer">
+        <Info size={14} />
+        <p>
+            All data is stored locally in your browser. Your training progress, experiences, and AI model persist across sessions but are specific to this browser and device. Use the Export function to back up your data or transfer it elsewhere.
+        </p>
+    </footer>
 </div>
 
 <style>
@@ -89,5 +97,27 @@
         .main-content {
             grid-template-columns: 1fr;
         }
+    }
+
+    .info-footer {
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+        margin-top: 24px;
+        padding: 12px 16px;
+        background: var(--bg-input);
+        border-radius: 8px;
+        color: var(--text-muted);
+        font-size: 12px;
+        line-height: 1.5;
+    }
+
+    .info-footer p {
+        margin: 0;
+    }
+
+    .info-footer :global(svg) {
+        flex-shrink: 0;
+        margin-top: 2px;
     }
 </style>
