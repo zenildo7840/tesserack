@@ -286,7 +286,7 @@ function handleAgentUpdate(update) {
     if (update.rlStats) {
         updateStats({
             totalReward: update.rlStats.reward?.totalReward || 0,
-            experiences: update.rlStats.buffer?.size || 0,
+            // Note: experiences is updated by handleCollectorUpdate only (authoritative source)
             mapsVisited: update.rlStats.reward?.visitedMaps || 0,
         });
     }
