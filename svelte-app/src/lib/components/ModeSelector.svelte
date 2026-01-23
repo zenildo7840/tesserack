@@ -1,13 +1,8 @@
 <script>
     import { activeMode } from '$lib/stores/agent';
     import { startWatchMode, stopAll } from '$lib/core/game-init.js';
-    import { Bot, Gamepad2, Square } from 'lucide-svelte';
+    import { Play, Eye, Square } from 'lucide-svelte';
     import PotionProgress from './PotionProgress.svelte';
-
-    const modes = [
-        { id: 'watch', label: 'Watch AI', icon: Bot },
-        { id: 'manual', label: 'Play', icon: Gamepad2 },
-    ];
 
     function selectMode(mode) {
         if ($activeMode === mode) {
@@ -30,64 +25,114 @@
         stopAll();
         activeMode.set('idle');
     }
+
+    $: isRunning = $activeMode !== 'idle';
 </script>
 
 <div class="mode-selector panel">
-    <PotionProgress />
+    <div class="controls">
+        <button
+            class="control-btn watch"
+            class:active={$activeMode === 'watch'}
+            on:click={() => selectMode('watch')}
+            title="Watch AI play"
+        >
+            <Eye size={18} />
+            <span>Watch</span>
+        </button>
 
-    <div class="mode-group">
-        {#each modes as mode}
-            <button
-                class="mode-btn"
-                class:active={$activeMode === mode.id}
-                on:click={() => selectMode(mode.id)}
-            >
-                <svelte:component this={mode.icon} size={16} />
-                <span class="mode-label">{mode.label}</span>
-            </button>
-        {/each}
+        <button
+            class="control-btn play"
+            class:active={$activeMode === 'manual'}
+            on:click={() => selectMode('manual')}
+            title="Play manually"
+        >
+            <Play size={18} />
+            <span>Play</span>
+        </button>
+
+        <button
+            class="control-btn stop"
+            class:visible={isRunning}
+            on:click={stop}
+            title="Stop"
+        >
+            <Square size={16} />
+            <span>Stop</span>
+        </button>
     </div>
 
-    {#if $activeMode !== 'idle'}
-        <button class="stop-btn" on:click={stop}>
-            <Square size={14} />
-            Stop
-        </button>
-    {/if}
+    <PotionProgress />
 </div>
 
 <style>
     .mode-selector {
         display: flex;
         align-items: center;
+        justify-content: space-between;
         gap: 16px;
     }
 
-    .mode-group {
-        flex: 1;
+    .controls {
+        display: flex;
+        gap: 8px;
     }
 
-    .mode-btn {
+    .control-btn {
         display: flex;
         align-items: center;
-        justify-content: center;
         gap: 6px;
-    }
-
-    .mode-label {
+        padding: 10px 16px;
         font-size: 13px;
+        font-weight: 500;
+        border-radius: var(--border-radius);
+        transition: all 0.15s ease;
     }
 
-    .stop-btn {
+    .control-btn.watch {
+        background: var(--bg-input);
+        color: var(--text-secondary);
+    }
+
+    .control-btn.watch:hover {
+        background: var(--bg-dark);
+        color: var(--text-primary);
+    }
+
+    .control-btn.watch.active {
+        background: var(--accent-primary);
+        color: white;
+    }
+
+    .control-btn.play {
+        background: var(--bg-input);
+        color: var(--text-secondary);
+    }
+
+    .control-btn.play:hover {
+        background: var(--bg-dark);
+        color: var(--text-primary);
+    }
+
+    .control-btn.play.active {
+        background: var(--accent-success);
+        color: white;
+    }
+
+    .control-btn.stop {
         background: var(--accent-secondary);
         color: white;
-        padding: 10px 20px;
-        display: flex;
-        align-items: center;
-        gap: 6px;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.15s ease;
     }
 
-    .stop-btn:hover {
+    .control-btn.stop.visible {
+        opacity: 1;
+        pointer-events: auto;
+    }
+
+    .control-btn.stop:hover {
         background: #ff8787;
     }
 </style>

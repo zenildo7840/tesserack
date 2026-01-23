@@ -132,7 +132,7 @@
 
             <!-- Save/Load Section -->
             <div class="section">
-                <div class="section-title">Game State</div>
+                <div class="section-title">Save & Load</div>
                 <div class="section-content">
                     <div class="button-row">
                         <button class="btn-ghost" on:click={saveGame}>

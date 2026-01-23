@@ -6,6 +6,7 @@
     import Header from '$lib/components/Header.svelte';
     import GameCanvas from '$lib/components/GameCanvas.svelte';
     import ModeSelector from '$lib/components/ModeSelector.svelte';
+    import GameStateBar from '$lib/components/GameStateBar.svelte';
     import AIPanel from '$lib/components/AIPanel.svelte';
     import ProgressBar from '$lib/components/ProgressBar.svelte';
     import GameControls from '$lib/components/GameControls.svelte';
@@ -13,6 +14,7 @@
     import ActivityFeed from '$lib/components/ActivityFeed.svelte';
     import AdvancedPanel from '$lib/components/AdvancedPanel.svelte';
     import RomDropzone from '$lib/components/RomDropzone.svelte';
+    import ModelStatus from '$lib/components/ModelStatus.svelte';
 
     // Stores
     import { romLoaded, gameState } from '$lib/stores/game';
@@ -47,6 +49,8 @@
         <div class="right-column">
             {#if $romLoaded}
                 <ModeSelector />
+                <ModelStatus />
+                <GameStateBar />
                 <AIPanel />
             {/if}
 

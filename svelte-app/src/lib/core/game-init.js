@@ -8,6 +8,7 @@ import { DataCollector } from './data-collector.js';
 import { CombinedRewardSystem } from './adaptive-rewards.js';
 import { TrainedPolicy, AutoTrainingManager } from './trained-policy.js';
 import * as persistence from './persistence.js';
+import { initLLM, isReady as isLLMReady } from './llm.js';
 
 // Store references
 import {
@@ -45,6 +46,13 @@ import {
     trackDiscovery,
     discoveries
 } from '$lib/stores/feed';
+
+import {
+    llmState,
+    setLLMProgress,
+    setLLMReady,
+    setLLMError
+} from '$lib/stores/llm';
 
 // Global instances (not in stores, just held here)
 let emu = null;
@@ -340,9 +348,41 @@ function handleAutoTrainEvent(event) {
 /**
  * Start Watch AI mode
  */
-export function startWatchMode() {
+export async function startWatchMode() {
     if (!rlAgentInstance) return;
+
+    // Initialize LLM if not ready (first time only, shows download progress)
+    if (!isLLMReady()) {
+        feedSystem('Loading AI model (Qwen2.5-1.5B)... First time may take a minute.');
+        llmState.update(s => ({ ...s, status: 'loading', progress: 0, message: 'Initializing...' }));
+
+        try {
+            await initLLM((progress) => {
+                setLLMProgress(progress);
+                // Update feed with download progress
+                if (progress.progress < 1) {
+                    const pct = Math.round(progress.progress * 100);
+                    feedSystem(`Downloading AI model: ${pct}%`);
+                }
+            });
+            setLLMReady();
+            feedSystem('AI model loaded! Starting...');
+        } catch (err) {
+            console.error('LLM initialization failed:', err);
+            setLLMError(err);
+            feedSystem('AI model failed to load. Running in exploration mode.');
+        }
+    }
+
+    // Start RL agent (uses LLM for planning)
     rlAgentInstance.run();
+
+    // Also start data collector to ensure experiences are collected
+    // even if LLM is slow or not yet loaded
+    if (collector) {
+        collector.startExploration(0);
+    }
+
     autoTrainerInstance?.startMonitoring(15000);
     feedSystem('AI is now playing...');
 }
