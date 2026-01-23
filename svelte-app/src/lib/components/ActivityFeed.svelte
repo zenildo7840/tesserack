@@ -75,7 +75,7 @@
         padding: 10px 12px;
         border-radius: var(--border-radius-sm);
         font-size: 13px;
-        background: var(--bg-dark);
+        background: var(--bg-input);
     }
 
     .feed-item.discovery {

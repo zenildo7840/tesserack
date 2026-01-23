@@ -1,6 +1,6 @@
 <script>
     import { activeMode } from '$lib/stores/agent';
-    import { feedSystem } from '$lib/stores/feed';
+    import { startWatchMode, startTrainMode, stopAll } from '$lib/core/game-init.js';
     import { Bot, Brain, Gamepad2, Square } from 'lucide-svelte';
 
     const modes = [
@@ -12,19 +12,25 @@
     function selectMode(mode) {
         if ($activeMode === mode) {
             // Toggle off
+            stopAll();
             activeMode.set('idle');
-            feedSystem('Stopped');
         } else {
+            // Stop current mode first
+            stopAll();
             activeMode.set(mode);
-            if (mode === 'watch') feedSystem('AI is now playing...');
-            if (mode === 'train') feedSystem('Training mode: collecting experiences...');
-            if (mode === 'manual') feedSystem('Manual mode: you are in control');
+
+            if (mode === 'watch') {
+                startWatchMode();
+            } else if (mode === 'train') {
+                startTrainMode();
+            }
+            // Manual mode doesn't need to start anything
         }
     }
 
     function stop() {
+        stopAll();
         activeMode.set('idle');
-        feedSystem('Stopped');
     }
 </script>
 
@@ -67,10 +73,6 @@
         align-items: center;
         justify-content: center;
         gap: 6px;
-    }
-
-    .mode-icon {
-        font-size: 14px;
     }
 
     .mode-label {

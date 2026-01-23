@@ -62,30 +62,30 @@
     .app {
         max-width: 1100px;
         margin: 0 auto;
-        padding: 20px;
+        padding: 16px 12px;
         min-height: 100vh;
     }
 
     .main-content {
         display: grid;
-        grid-template-columns: 340px 1fr;
-        gap: 24px;
-        margin-top: 20px;
+        grid-template-columns: 400px 1fr;
+        gap: 20px;
+        margin-top: 16px;
     }
 
     .left-column {
         display: flex;
         flex-direction: column;
-        gap: 16px;
+        gap: 12px;
     }
 
     .right-column {
         display: flex;
         flex-direction: column;
-        gap: 16px;
+        gap: 12px;
     }
 
-    @media (max-width: 800px) {
+    @media (max-width: 900px) {
         .main-content {
             grid-template-columns: 1fr;
         }

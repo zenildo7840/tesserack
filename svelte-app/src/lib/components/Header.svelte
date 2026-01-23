@@ -24,8 +24,7 @@
                 </span>
             {:else}
                 <span class="model-badge untrained">
-                    <XCircle size={14} />
-                    No Model
+                    Untrained
                 </span>
             {/if}
         {/if}
@@ -38,7 +37,7 @@
         justify-content: space-between;
         align-items: center;
         padding-bottom: 16px;
-        border-bottom: 1px solid rgba(255,255,255,0.1);
+        border-bottom: 1px solid var(--border-color);
     }
 
     .logo {
@@ -82,7 +81,8 @@
     }
 
     .model-badge.untrained {
-        background: rgba(255, 107, 107, 0.15);
-        color: var(--accent-secondary);
+        background: var(--bg-input);
+        color: var(--text-secondary);
+        border: 1px solid var(--border-color);
     }
 </style>

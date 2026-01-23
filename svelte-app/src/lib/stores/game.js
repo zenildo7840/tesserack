@@ -20,6 +20,9 @@ export const gameState = writable({
 // ROM loaded state
 export const romLoaded = writable(false);
 
+// ROM buffer (passed from dropzone to canvas for initialization)
+export const romBuffer = writable(null);
+
 // Derived state
 export const badgeCount = derived(gameState, $state => $state.badges?.length || 0);
 export const partyCount = derived(gameState, $state => $state.party?.length || 0);

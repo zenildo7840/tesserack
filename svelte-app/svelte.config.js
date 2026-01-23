@@ -1,5 +1,7 @@
 import adapter from '@sveltejs/adapter-static';
 
+const dev = process.argv.includes('dev');
+
 /** @type {import('@sveltejs/kit').Config} */
 const config = {
 	kit: {
@@ -11,7 +13,8 @@ const config = {
 			strict: true
 		}),
 		paths: {
-			base: ''
+			// Use /tesserack base path for GitHub Pages, empty for local dev
+			base: dev ? '' : '/tesserack'
 		}
 	}
 };

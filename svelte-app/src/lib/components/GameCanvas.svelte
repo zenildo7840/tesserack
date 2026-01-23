@@ -1,12 +1,16 @@
 <script>
     import { onMount } from 'svelte';
-    import { emulator } from '$lib/stores/game';
+    import { get } from 'svelte/store';
+    import { romBuffer } from '$lib/stores/game';
+    import { initializeGame } from '$lib/core/game-init.js';
 
     let canvas;
 
-    onMount(() => {
-        // Canvas will be connected to emulator
-        // $emulator?.setCanvas(canvas);
+    onMount(async () => {
+        const buffer = get(romBuffer);
+        if (buffer && canvas) {
+            await initializeGame(buffer, canvas);
+        }
     });
 </script>
 
@@ -23,12 +27,14 @@
     .canvas-container {
         background: var(--bg-panel);
         border-radius: var(--border-radius);
-        padding: 10px;
+        padding: 12px;
+        border: 1px solid var(--border-color);
+        box-shadow: var(--shadow-soft);
     }
 
     .game-canvas {
-        width: 320px;
-        height: 288px;
+        width: 100%;
+        aspect-ratio: 160 / 144;
         image-rendering: pixelated;
         background: #000;
         display: block;

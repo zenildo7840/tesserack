@@ -1,5 +1,5 @@
 <script>
-    import { romLoaded, emulator, memoryReader } from '$lib/stores/game';
+    import { romLoaded, romBuffer } from '$lib/stores/game';
     import { feedSystem } from '$lib/stores/feed';
     import { Upload } from 'lucide-svelte';
 
@@ -15,10 +15,8 @@
             const buffer = await file.arrayBuffer();
             console.log('ROM loaded:', buffer.byteLength, 'bytes');
 
-            // TODO: Initialize emulator with buffer
-            // This will be connected to the actual emulator module
-
-            feedSystem('ROM loaded! Initializing AI model...');
+            // Store the buffer - GameCanvas will handle initialization
+            romBuffer.set(buffer);
             romLoaded.set(true);
 
         } catch (err) {
@@ -84,8 +82,8 @@
 
 <style>
     .dropzone {
-        width: 320px;
-        height: 288px;
+        width: 100%;
+        aspect-ratio: 160 / 144;
         background: var(--bg-panel);
         border: 2px dashed var(--text-muted);
         border-radius: var(--border-radius);
@@ -99,7 +97,7 @@
     .dropzone:hover,
     .dropzone.dragging {
         border-color: var(--accent-primary);
-        background: rgba(78, 205, 196, 0.05);
+        background: rgba(116, 185, 255, 0.08);
     }
 
     .dropzone-content {

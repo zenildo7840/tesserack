@@ -41,35 +41,45 @@
     .progress-bar {
         background: var(--bg-panel);
         border-radius: var(--border-radius);
-        padding: 12px 16px;
+        padding: 10px 12px;
         display: flex;
         justify-content: space-between;
         align-items: center;
-        gap: 16px;
+        gap: 8px;
+        border: 1px solid var(--border-color);
+        box-shadow: var(--shadow-soft);
     }
 
     .badges {
         display: flex;
         align-items: center;
-        gap: 12px;
+        gap: 8px;
+        flex-shrink: 0;
     }
 
     .badge-label {
-        font-size: 12px;
+        font-size: 11px;
         color: var(--text-secondary);
+        white-space: nowrap;
     }
 
     .stat-pills {
         display: flex;
-        gap: 8px;
+        gap: 6px;
+        flex-wrap: wrap;
+        justify-content: flex-end;
     }
 
     .stat-pill {
-        min-width: 60px;
-        padding: 6px 12px;
+        min-width: 50px;
+        padding: 4px 8px;
     }
 
     .stat-pill .value {
-        font-size: 14px;
+        font-size: 13px;
+    }
+
+    .stat-pill .label {
+        font-size: 9px;
     }
 </style>

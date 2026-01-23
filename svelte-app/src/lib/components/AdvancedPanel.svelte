@@ -2,6 +2,15 @@
     import { modelState, trainingProgress, autoTrainEnabled } from '$lib/stores/training';
     import { stats } from '$lib/stores/agent';
     import { ChevronDown, ChevronUp, Download, Trash2, Save, Upload } from 'lucide-svelte';
+    import {
+        trainNow as doTrainNow,
+        clearModel as doClearModel,
+        saveGame as doSaveGame,
+        loadGame as doLoadGame,
+        exportTrainingData,
+        exportModel,
+        exportDiscoveries
+    } from '$lib/core/game-init.js';
 
     let expanded = false;
 
@@ -10,27 +19,47 @@
     }
 
     async function trainNow() {
-        // Will connect to trainer
-        console.log('Train now clicked');
+        await doTrainNow();
     }
 
     function exportData() {
-        // Will connect to export
-        console.log('Export data clicked');
+        const data = exportTrainingData();
+        if (data) {
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'tesserack-training-data.json';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
     }
 
-    function clearModel() {
+    async function exportModelData() {
+        const data = await exportModel();
+        if (data) {
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'tesserack-model.json';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+    }
+
+    async function clearModel() {
         if (confirm('Clear the trained model? You will need to retrain.')) {
-            console.log('Clear model clicked');
+            await doClearModel();
         }
     }
 
     function saveGame() {
-        console.log('Save game clicked');
+        doSaveGame();
     }
 
     function loadGame() {
-        console.log('Load game clicked');
+        doLoadGame();
     }
 </script>
 
@@ -93,7 +122,7 @@
                             <Download size={14} />
                             Export Training Data
                         </button>
-                        <button class="btn-ghost" on:click={exportData}>
+                        <button class="btn-ghost" on:click={exportModelData}>
                             <Download size={14} />
                             Export Model
                         </button>
@@ -124,7 +153,7 @@
 <style>
     .advanced-panel {
         margin-top: 16px;
-        border-top: 1px solid rgba(255,255,255,0.1);
+        border-top: 1px solid var(--border-color);
         padding-top: 16px;
     }
 

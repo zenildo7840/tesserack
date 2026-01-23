@@ -1,6 +1,46 @@
 // emulator.js - GameBoy emulator wrapper using binjgb
 // Provides a clean API for loading ROMs, rendering, input, memory access, and state management
 
+// Track if binjgb script has been loaded
+let binjgbLoaded = false;
+let binjgbLoadPromise = null;
+
+/**
+ * Dynamically load binjgb.js script
+ * @returns {Promise<void>}
+ */
+function loadBinjgbScript() {
+    if (binjgbLoaded && typeof Binjgb !== 'undefined') {
+        return Promise.resolve();
+    }
+
+    if (binjgbLoadPromise) {
+        return binjgbLoadPromise;
+    }
+
+    binjgbLoadPromise = new Promise((resolve, reject) => {
+        // Check if already loaded
+        if (typeof Binjgb !== 'undefined') {
+            binjgbLoaded = true;
+            resolve();
+            return;
+        }
+
+        const script = document.createElement('script');
+        script.src = '/lib/binjgb.js';
+        script.onload = () => {
+            binjgbLoaded = true;
+            resolve();
+        };
+        script.onerror = () => {
+            reject(new Error('Failed to load binjgb.js'));
+        };
+        document.head.appendChild(script);
+    });
+
+    return binjgbLoadPromise;
+}
+
 // Constants from binjgb
 const SCREEN_WIDTH = 160;
 const SCREEN_HEIGHT = 144;
@@ -45,8 +85,11 @@ export class Emulator {
      * @returns {Promise<boolean>}
      */
     async init() {
+        // Dynamically load binjgb.js if not already loaded
+        await loadBinjgbScript();
+
         if (typeof Binjgb === 'undefined') {
-            throw new Error('binjgb not loaded. Make sure binjgb.js is included before this script.');
+            throw new Error('binjgb not loaded. Script loaded but Binjgb function not found.');
         }
 
         // Initialize the WASM module

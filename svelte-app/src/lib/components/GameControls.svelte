@@ -1,18 +1,14 @@
 <script>
-    import { emulator } from '$lib/stores/game';
     import { activeMode } from '$lib/stores/agent';
+    import { pressButton, setButton } from '$lib/core/game-init.js';
     import { ChevronUp, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-svelte';
 
     function press(button) {
-        // Will connect to emulator
-        console.log('Press:', button);
-        // $emulator?.pressButton(button);
+        pressButton(button);
     }
 
     function hold(button, pressed) {
-        // For manual mode continuous hold
-        console.log(pressed ? 'Hold:' : 'Release:', button);
-        // $emulator?.setButton(button, pressed);
+        setButton(button, pressed);
     }
 
     // Keyboard controls
@@ -73,8 +69,8 @@
         display: flex;
         align-items: center;
         justify-content: space-between;
-        gap: 20px;
-        padding: 16px;
+        gap: 16px;
+        padding: 14px 16px;
     }
 
     .dpad {
@@ -92,23 +88,24 @@
     .dpad-btn {
         width: 36px;
         height: 36px;
-        background: var(--bg-dark);
+        background: var(--bg-input);
         color: var(--text-secondary);
         border-radius: 6px;
         font-size: 14px;
         display: flex;
         align-items: center;
         justify-content: center;
+        border: 1px solid var(--border-color);
     }
 
     .dpad-btn:hover {
-        background: var(--text-muted);
+        background: var(--border-color);
         color: var(--text-primary);
     }
 
     .dpad-btn:active {
         background: var(--accent-primary);
-        color: var(--bg-dark);
+        color: white;
     }
 
     .action-buttons {
@@ -131,7 +128,7 @@
 
     .btn-b {
         background: var(--accent-primary);
-        color: var(--bg-dark);
+        color: white;
     }
 
     .btn-a:active, .btn-b:active {
@@ -144,14 +141,16 @@
     }
 
     .btn-menu {
-        padding: 8px 12px;
-        background: var(--text-muted);
-        color: var(--text-primary);
+        padding: 8px 14px;
+        background: var(--bg-input);
+        color: var(--text-secondary);
         font-size: 11px;
         border-radius: 12px;
+        border: 1px solid var(--border-color);
     }
 
     .btn-menu:hover {
-        background: var(--text-secondary);
+        background: var(--border-color);
+        color: var(--text-primary);
     }
 </style>

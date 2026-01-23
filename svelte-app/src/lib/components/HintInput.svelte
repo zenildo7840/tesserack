@@ -56,7 +56,7 @@
         top: 50%;
         transform: translateY(-50%);
         background: var(--accent-primary);
-        color: var(--bg-dark);
+        color: white;
         padding: 8px;
         border-radius: 6px;
         display: flex;
@@ -74,7 +74,7 @@
         font-size: 12px;
         color: var(--accent-primary);
         padding: 8px 12px;
-        background: rgba(78, 205, 196, 0.1);
+        background: rgba(116, 185, 255, 0.15);
         border-radius: var(--border-radius-sm);
     }
 </style>
