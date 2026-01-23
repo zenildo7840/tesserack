@@ -434,3 +434,124 @@ h3 {
 .rl-controls button:hover {
     background: #5de0d7;
 }
+
+/* Data Collection Panel */
+.data-panel {
+    background: #16213e;
+    border-radius: 10px;
+    padding: 15px;
+    border: 2px solid #ff6b6b;
+}
+
+.data-controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.data-btn {
+    padding: 8px 12px;
+    border: none;
+    border-radius: 5px;
+    font-family: inherit;
+    font-size: 12px;
+    cursor: pointer;
+    background: #333;
+    color: #fff;
+}
+
+.data-btn:hover:not(:disabled) {
+    background: #444;
+}
+
+.data-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+#explore-btn:not(:disabled) {
+    background: #9b59b6;
+}
+
+#explore-btn:hover:not(:disabled) {
+    background: #a66bbe;
+}
+
+#record-btn:not(:disabled) {
+    background: #e74c3c;
+}
+
+#record-btn:hover:not(:disabled) {
+    background: #ec7063;
+}
+
+#record-btn.recording {
+    background: #c0392b;
+    animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+
+.data-stats {
+    background: #0f0f1a;
+    padding: 10px;
+    border-radius: 5px;
+    font-size: 12px;
+    line-height: 1.6;
+}
+
+.data-stats span {
+    color: #ff6b6b;
+    font-weight: bold;
+}
+
+.collect-status {
+    margin-top: 8px;
+    padding: 6px 10px;
+    font-size: 11px;
+    color: #888;
+    min-height: 20px;
+}
+
+.collect-status.active {
+    background: #2d3a4e;
+    border-radius: 4px;
+    color: #4ecdc4;
+}
+
+.data-export {
+    margin-top: 10px;
+    display: flex;
+    gap: 8px;
+}
+
+.data-export button {
+    padding: 6px 12px;
+    border: none;
+    border-radius: 5px;
+    font-size: 11px;
+    cursor: pointer;
+    background: #27ae60;
+    color: #fff;
+}
+
+.data-export button:hover:not(:disabled) {
+    background: #2ecc71;
+}
+
+.data-export button:disabled {
+    background: #333;
+    color: #666;
+    cursor: not-allowed;
+}
+
+#clear-data-btn {
+    background: #7f8c8d;
+}
+
+#clear-data-btn:hover:not(:disabled) {
+    background: #95a5a6;
+}

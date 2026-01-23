@@ -4,6 +4,7 @@ import { MemoryReader } from './memory-reader.js';
 import { initLLM, isReady } from './llm.js';
 import { GameAgent } from './agent.js';
 import { RLAgent } from './rl-agent.js';
+import { DataCollector } from './data-collector.js';
 import { saveState, loadState, hasSavedState } from './storage.js';
 
 console.log('Tesserack loading...');
@@ -30,6 +31,17 @@ const rlExplorationSpan = document.getElementById('rl-exploration');
 const explorationSlider = document.getElementById('exploration-slider');
 const exportRlBtn = document.getElementById('export-rl-btn');
 
+// Data collection elements
+const exploreBtn = document.getElementById('explore-btn');
+const recordBtn = document.getElementById('record-btn');
+const stopCollectBtn = document.getElementById('stop-collect-btn');
+const exploreCountSpan = document.getElementById('explore-count');
+const humanCountSpan = document.getElementById('human-count');
+const collectRewardSpan = document.getElementById('collect-reward');
+const collectStatus = document.getElementById('collect-status');
+const exportTrainingBtn = document.getElementById('export-training-btn');
+const clearDataBtn = document.getElementById('clear-data-btn');
+
 // Manual control buttons
 const manualButtons = document.querySelectorAll('[data-btn]');
 const turboABtn = document.getElementById('turbo-a-btn');
@@ -46,6 +58,7 @@ let turboAInterval = null;
 let llmInitialized = false;
 let agent = null;
 let rlAgent = null;
+let dataCollector = null;
 let activeAgent = null;  // Currently running agent
 let memoryReader = null;
 
@@ -121,6 +134,45 @@ function updateRLStats(stats) {
     }
 }
 
+// Data collector update handler
+function handleCollectorUpdate(update) {
+    // Update stats display
+    if (update.stats) {
+        exploreCountSpan.textContent = update.stats.explorationSteps || 0;
+        humanCountSpan.textContent = update.stats.humanDemos || 0;
+        collectRewardSpan.textContent = Math.round(update.stats.totalReward || 0);
+    }
+
+    // Update status
+    if (update.mode === 'exploration') {
+        collectStatus.textContent = `Exploring... Step ${update.stepCount}`;
+        collectStatus.classList.add('active');
+    } else if (update.mode === 'recording') {
+        if (update.status === 'started') {
+            collectStatus.textContent = 'Recording your inputs...';
+            collectStatus.classList.add('active');
+            recordBtn.classList.add('recording');
+            recordBtn.textContent = 'Recording...';
+        } else if (update.status === 'stopped') {
+            collectStatus.textContent = `Recording stopped. ${update.stats?.humanDemos || 0} demos captured.`;
+            recordBtn.classList.remove('recording');
+            recordBtn.textContent = 'Record Me';
+        } else if (update.action) {
+            collectStatus.textContent = `Recorded: ${update.action[0]} (reward: ${update.reward || 0})`;
+        }
+    }
+
+    // Update game state display
+    if (update.state) {
+        document.getElementById('game-state').innerHTML = formatState(update.state);
+    }
+
+    // Enable export if we have data
+    const hasData = (update.stats?.explorationSteps || 0) + (update.stats?.humanDemos || 0) > 0;
+    exportTrainingBtn.disabled = !hasData;
+    clearDataBtn.disabled = !hasData;
+}
+
 // Format game state for display
 function formatState(state) {
     return `
@@ -184,6 +236,13 @@ async function loadROM(file) {
         memoryReader = new MemoryReader(emulator);
         agent = new GameAgent(emulator, memoryReader, handleAgentUpdate);
         rlAgent = new RLAgent(emulator, memoryReader, handleAgentUpdate);
+        dataCollector = new DataCollector(emulator, memoryReader, handleCollectorUpdate);
+
+        // Enable data collection buttons
+        exploreBtn.disabled = false;
+        recordBtn.disabled = false;
+        exportTrainingBtn.disabled = true;
+        clearDataBtn.disabled = true;
 
         // Start emulator display loop
         emulator.start();
@@ -318,6 +377,11 @@ manualButtons.forEach(btn => {
 
     // Mouse events - use agent.manualButton for press, direct emulator for hold/release
     btn.addEventListener('mousedown', () => {
+        // Record if in recording mode
+        if (dataCollector?.isRecording) {
+            dataCollector.recordHumanAction(buttonName);
+        }
+
         if (agent && agent.running) {
             agent.manualButton(buttonName);
         } else if (emulator) {
@@ -334,6 +398,11 @@ manualButtons.forEach(btn => {
     // Touch events for mobile
     btn.addEventListener('touchstart', (e) => {
         e.preventDefault();
+        // Record if in recording mode
+        if (dataCollector?.isRecording) {
+            dataCollector.recordHumanAction(buttonName);
+        }
+
         if (agent && agent.running) {
             agent.manualButton(buttonName);
         } else if (emulator) {
@@ -386,8 +455,17 @@ document.addEventListener('keydown', (e) => {
     }
 
     const button = keyMap[e.key];
-    if (button && agent) {
-        agent.manualButton(button);
+    if (button) {
+        // Record if in recording mode
+        if (dataCollector?.isRecording) {
+            dataCollector.recordHumanAction(button);
+        }
+
+        if (agent && agent.running) {
+            agent.manualButton(button);
+        } else if (emulator) {
+            emulator.pressButton(button);
+        }
         e.preventDefault();
     }
 });
@@ -431,6 +509,89 @@ exportRlBtn.addEventListener('click', () => {
         a.click();
         URL.revokeObjectURL(url);
         statusText.textContent = 'RL data exported!';
+    }
+});
+
+// Data collection controls
+exploreBtn.addEventListener('click', () => {
+    if (dataCollector) {
+        // Disable other modes
+        turboBtn.disabled = true;
+        llmBtn.disabled = true;
+        rlBtn.disabled = true;
+        exploreBtn.disabled = true;
+        recordBtn.disabled = true;
+        stopCollectBtn.disabled = false;
+
+        statusText.textContent = 'Random exploration running...';
+        dataCollector.startExploration(0);  // 0 = unlimited
+    }
+});
+
+recordBtn.addEventListener('click', () => {
+    if (dataCollector) {
+        if (dataCollector.isRecording) {
+            // Stop recording
+            dataCollector.stopRecording();
+            recordBtn.classList.remove('recording');
+            recordBtn.textContent = 'Record Me';
+            stopCollectBtn.disabled = true;
+            exploreBtn.disabled = false;
+            statusText.textContent = 'Recording stopped.';
+        } else {
+            // Start recording
+            dataCollector.startRecording();
+            recordBtn.classList.add('recording');
+            recordBtn.textContent = 'Stop Recording';
+            exploreBtn.disabled = true;
+            stopCollectBtn.disabled = false;
+            statusText.textContent = 'Recording your inputs - play the game!';
+        }
+    }
+});
+
+stopCollectBtn.addEventListener('click', () => {
+    if (dataCollector) {
+        dataCollector.stop();
+    }
+    // Re-enable buttons
+    turboBtn.disabled = false;
+    llmBtn.disabled = !llmInitialized;
+    rlBtn.disabled = !llmInitialized;
+    exploreBtn.disabled = false;
+    recordBtn.disabled = false;
+    recordBtn.classList.remove('recording');
+    recordBtn.textContent = 'Record Me';
+    stopCollectBtn.disabled = true;
+    collectStatus.textContent = 'Stopped.';
+    collectStatus.classList.remove('active');
+    statusText.textContent = 'Data collection stopped.';
+});
+
+exportTrainingBtn.addEventListener('click', () => {
+    if (dataCollector) {
+        const data = dataCollector.exportForTraining();
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `pokemon-training-data-${Date.now()}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+        statusText.textContent = `Exported ${data.data.length} training samples!`;
+    }
+});
+
+clearDataBtn.addEventListener('click', () => {
+    if (dataCollector && confirm('Clear all collected data?')) {
+        dataCollector.clear();
+        exploreCountSpan.textContent = '0';
+        humanCountSpan.textContent = '0';
+        collectRewardSpan.textContent = '0';
+        collectStatus.textContent = 'Data cleared.';
+        exportTrainingBtn.disabled = true;
+        clearDataBtn.disabled = true;
+        statusText.textContent = 'Data cleared.';
     }
 });
 

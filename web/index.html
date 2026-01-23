@@ -89,6 +89,25 @@
                         <button id="export-rl-btn">Export Data</button>
                     </div>
                 </div>
+
+                <div class="data-panel">
+                    <h3>Data Collection</h3>
+                    <div class="data-controls">
+                        <button id="explore-btn" class="data-btn" disabled>Random Explore</button>
+                        <button id="record-btn" class="data-btn" disabled>Record Me</button>
+                        <button id="stop-collect-btn" class="data-btn" disabled>Stop</button>
+                    </div>
+                    <div class="data-stats">
+                        <div><strong>Exploration:</strong> <span id="explore-count">0</span> steps</div>
+                        <div><strong>Human Demos:</strong> <span id="human-count">0</span></div>
+                        <div><strong>Total Reward:</strong> <span id="collect-reward">0</span></div>
+                    </div>
+                    <div id="collect-status" class="collect-status"></div>
+                    <div class="data-export">
+                        <button id="export-training-btn" disabled>Export for Training</button>
+                        <button id="clear-data-btn" disabled>Clear Data</button>
+                    </div>
+                </div>
             </div>
         </main>
 
