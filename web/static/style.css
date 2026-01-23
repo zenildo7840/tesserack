@@ -1,0 +1,116 @@
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: 'Courier New', monospace;
+    background: #1a1a2e;
+    color: #eee;
+    min-height: 100vh;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 20px;
+    border-bottom: 2px solid #333;
+}
+
+h1 {
+    color: #ff6b6b;
+}
+
+.controls button {
+    padding: 10px 20px;
+    margin-left: 10px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 14px;
+}
+
+.controls button:not(:disabled) {
+    background: #4ecdc4;
+    color: #1a1a2e;
+}
+
+.controls button:disabled {
+    background: #333;
+    color: #666;
+    cursor: not-allowed;
+}
+
+main {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto auto;
+    gap: 20px;
+}
+
+.game-panel, .state-panel, .reasoning-panel {
+    background: #16213e;
+    border-radius: 10px;
+    padding: 20px;
+}
+
+.game-panel {
+    grid-row: span 2;
+}
+
+h2 {
+    color: #4ecdc4;
+    margin-bottom: 15px;
+    font-size: 16px;
+}
+
+#gameCanvas {
+    width: 100%;
+    max-width: 320px;
+    height: auto;
+    image-rendering: pixelated;
+    background: #000;
+    border: 2px solid #333;
+}
+
+#gameState {
+    font-size: 13px;
+    line-height: 1.6;
+}
+
+#gameState p {
+    margin-bottom: 5px;
+}
+
+.reasoning-panel {
+    grid-column: span 1;
+}
+
+#reasoning {
+    background: #0f0f1a;
+    padding: 15px;
+    border-radius: 5px;
+    max-height: 200px;
+    overflow-y: auto;
+    font-size: 13px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+}
+
+.action {
+    margin-top: 15px;
+    padding: 10px;
+    background: #ff6b6b;
+    color: #1a1a2e;
+    border-radius: 5px;
+}

@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LocalLLMPlaysPokemon</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>LocalLLMPlaysPokemon</h1>
+            <div class="controls">
+                <button id="startBtn">Start</button>
+                <button id="stopBtn" disabled>Stop</button>
+                <button id="stepBtn" disabled>Step</button>
+            </div>
+        </header>
+
+        <main>
+            <div class="game-panel">
+                <h2>Game Screen</h2>
+                <canvas id="gameCanvas" width="160" height="144"></canvas>
+            </div>
+
+            <div class="state-panel">
+                <h2>Game State</h2>
+                <div id="gameState">
+                    <p>Waiting to start...</p>
+                </div>
+            </div>
+
+            <div class="reasoning-panel">
+                <h2>LLM Reasoning</h2>
+                <div id="reasoning">
+                    <p>Waiting for agent...</p>
+                </div>
+                <div class="action">
+                    <strong>Action:</strong> <span id="action">-</span>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>
