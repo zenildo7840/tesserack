@@ -261,20 +261,20 @@ manualButtons.forEach(btn => {
     });
 });
 
-// Turbo A button
+// Turbo A button (hold)
 turboABtn.addEventListener('mousedown', () => {
-    if (emulator && !turboAInterval) {
-        turboAInterval = setInterval(() => {
-            emulator.pressButton('a', 50);
-        }, 100);
-    }
+    turboAInterval = setInterval(() => {
+        if (agent) agent.manualButton('a');
+    }, 100);
 });
+
 turboABtn.addEventListener('mouseup', () => {
     if (turboAInterval) {
         clearInterval(turboAInterval);
         turboAInterval = null;
     }
 });
+
 turboABtn.addEventListener('mouseleave', () => {
     if (turboAInterval) {
         clearInterval(turboAInterval);
@@ -288,24 +288,17 @@ const keyMap = {
     'ArrowDown': 'down',
     'ArrowLeft': 'left',
     'ArrowRight': 'right',
-    'KeyZ': 'b',
-    'KeyX': 'a',
+    'z': 'a',
+    'x': 'b',
     'Enter': 'start',
-    'ShiftRight': 'select',
-    'Tab': 'select'
+    'Shift': 'select'
 };
 
-window.addEventListener('keydown', (e) => {
-    if (emulator && keyMap[e.code]) {
+document.addEventListener('keydown', (e) => {
+    const button = keyMap[e.key];
+    if (button && agent) {
+        agent.manualButton(button);
         e.preventDefault();
-        emulator.setButton(keyMap[e.code], true);
-    }
-});
-
-window.addEventListener('keyup', (e) => {
-    if (emulator && keyMap[e.code]) {
-        e.preventDefault();
-        emulator.setButton(keyMap[e.code], false);
     }
 });
 
