@@ -60,6 +60,14 @@ export class GameAgent {
             this.emu.pressButton(action);
             this.stepCount++;
 
+            // Autosave every 50 steps
+            if (this.stepCount % 50 === 0) {
+                import('./storage.js').then(({ saveState }) => {
+                    saveState(this.emu);
+                    console.log('Autosaved at step', this.stepCount);
+                });
+            }
+
             if (this.onUpdate) {
                 this.onUpdate({
                     action: [action],
@@ -120,6 +128,14 @@ export class GameAgent {
 
             this.emu.pressButton('a');
             this.stepCount++;
+
+            // Autosave every 50 steps
+            if (this.stepCount % 50 === 0) {
+                import('./storage.js').then(({ saveState }) => {
+                    saveState(this.emu);
+                    console.log('Autosaved at step', this.stepCount);
+                });
+            }
 
             if (this.stepCount % 10 === 0 && this.onUpdate) {
                 this.onUpdate({

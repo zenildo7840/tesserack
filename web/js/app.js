@@ -3,6 +3,7 @@ import { Emulator } from './emulator.js';
 import { initLLM, generate, isReady } from './llm.js';
 import { GameAgent } from './agent.js';
 import { MemoryReader } from './memory-reader.js';
+import { saveState, loadState, hasSavedState } from './storage.js';
 
 console.log('Tesserack loading...');
 
@@ -25,7 +26,6 @@ const turboABtn = document.getElementById('turbo-a-btn');
 // State
 let emulator = null;
 let turboAInterval = null;
-let savedState = null;
 let llmInitialized = false;
 let agent = null;
 let memoryReader = null;
@@ -117,7 +117,7 @@ async function loadROM(file) {
         turboBtn.disabled = false;
         llmBtn.disabled = true; // Will be enabled after LLM loads
         saveBtn.disabled = false;
-        loadBtn.disabled = false;
+        loadBtn.disabled = !hasSavedState();
         stopBtn.disabled = false;
 
         // Set up frame callback to update game state display
@@ -208,39 +208,21 @@ stopBtn.addEventListener('click', () => {
 
 saveBtn.addEventListener('click', () => {
     if (emulator) {
-        try {
-            savedState = emulator.saveState();
-            // Also save to localStorage
-            localStorage.setItem('tesserack_savestate', JSON.stringify(Array.from(savedState)));
-            statusText.textContent = 'State saved!';
-        } catch (e) {
-            statusText.textContent = `Save failed: ${e.message}`;
-            console.error('Save state error:', e);
+        if (saveState(emulator)) {
+            statusText.textContent = 'Game saved!';
+            loadBtn.disabled = false;
+        } else {
+            statusText.textContent = 'Save failed!';
         }
     }
 });
 
 loadBtn.addEventListener('click', () => {
     if (emulator) {
-        try {
-            // Try to load from memory first, then localStorage
-            let stateToLoad = savedState;
-            if (!stateToLoad) {
-                const stored = localStorage.getItem('tesserack_savestate');
-                if (stored) {
-                    stateToLoad = new Uint8Array(JSON.parse(stored));
-                }
-            }
-
-            if (stateToLoad) {
-                emulator.loadState(stateToLoad);
-                statusText.textContent = 'State loaded!';
-            } else {
-                statusText.textContent = 'No saved state found';
-            }
-        } catch (e) {
-            statusText.textContent = `Load failed: ${e.message}`;
-            console.error('Load state error:', e);
+        if (loadState(emulator)) {
+            statusText.textContent = 'Game loaded!';
+        } else {
+            statusText.textContent = 'Load failed!';
         }
     }
 });
