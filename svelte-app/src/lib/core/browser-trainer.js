@@ -432,6 +432,13 @@ export class BrowserTrainer {
 
             this.model = await tf.loadLayersModel(`indexeddb://${this.modelStorageKey}`);
 
+            // Recompile the model (required after loading for training)
+            this.model.compile({
+                optimizer: tf.train.adam(this.config.learningRate),
+                loss: 'categoricalCrossentropy',
+                metrics: ['accuracy']
+            });
+
             console.log(`Model loaded from IndexedDB (sessions: ${this.trainingSessions}, nextThreshold: ${this.trainingThresholds[this.nextThresholdIndex]})`);
             return true;
         } catch (e) {
