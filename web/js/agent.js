@@ -11,6 +11,13 @@ CONTROLS:
 - Use directions to move on the map or navigate menus
 - In battle: select moves with up/down, confirm with 'a'
 
+IMPORTANT RULES:
+- Do NOT open the menu (start) unless you specifically need to use an item, check Pokemon, or save
+- Focus on MOVEMENT and INTERACTION - walk to destinations and talk to people
+- If dialog is showing, press 'a' repeatedly to advance it
+- Avoid random menu browsing - it wastes time
+- When stuck, try moving in different directions, not opening menus
+
 OUTPUT FORMAT (follow exactly):
 PLAN: <brief 1-line explanation of your immediate goal>
 ACTIONS: button1, button2, button3, button4, button5, button6, button7, button8, button9, button10
@@ -70,6 +77,37 @@ const OBJECTIVES = {
         hint: "Victory Road to Indigo Plateau. Face Lorelei (Ice), Bruno (Fighting), Agatha (Ghost), Lance (Dragon), then Champion."
     }
 };
+
+/**
+ * Filter actions to reduce menu spam
+ * @param {string[]} actions - Raw actions from LLM
+ * @returns {string[]} - Filtered actions
+ */
+function filterActions(actions) {
+    const filtered = [];
+    let startCount = 0;
+    let selectCount = 0;
+
+    for (const action of actions) {
+        const btn = action.toLowerCase();
+
+        // Limit start presses to max 1 per batch
+        if (btn === 'start') {
+            if (startCount >= 1) continue; // Skip extra start presses
+            startCount++;
+        }
+
+        // Limit select presses (rarely needed)
+        if (btn === 'select') {
+            if (selectCount >= 1) continue;
+            selectCount++;
+        }
+
+        filtered.push(action);
+    }
+
+    return filtered;
+}
 
 function getObjective(state) {
     const badgeCount = state.badges.length;
@@ -225,8 +263,8 @@ export class GameAgent {
             // Add to conversation history
             this.addToHistory(userMessage, response);
 
-            // Queue all actions
-            this.actionQueue = [...actions];
+            // Filter out excessive menu actions and queue
+            this.actionQueue = filterActions(actions);
 
             if (this.onUpdate) {
                 this.onUpdate({
