@@ -23,6 +23,12 @@ const gameStateDiv = document.getElementById('game-state');
 const manualButtons = document.querySelectorAll('[data-btn]');
 const turboABtn = document.getElementById('turbo-a-btn');
 
+// Hint input
+const hintInput = document.getElementById('hint-input');
+const hintBtn = document.getElementById('hint-btn');
+const hintStatus = document.getElementById('hint-status');
+const objectiveDiv = document.getElementById('objective');
+
 // State
 let emulator = null;
 let turboAInterval = null;
@@ -64,6 +70,20 @@ function handleAgentUpdate(update) {
     document.getElementById('game-state').innerHTML = formatState(update.state);
     document.getElementById('reasoning').textContent = update.reasoning;
     document.getElementById('actions').textContent = update.action.join(', ');
+
+    // Update objective display
+    if (update.objective) {
+        objectiveDiv.innerHTML = `<strong>Objective:</strong> ${update.objective}`;
+    }
+
+    // Update hint status
+    if (update.userHint) {
+        hintStatus.textContent = `Following hint (${update.hintRemaining} calls remaining): "${update.userHint}"`;
+        hintStatus.classList.add('active');
+    } else {
+        hintStatus.textContent = '';
+        hintStatus.classList.remove('active');
+    }
 }
 
 // Format game state for display
@@ -119,6 +139,8 @@ async function loadROM(file) {
         saveBtn.disabled = false;
         loadBtn.disabled = !hasSavedState();
         stopBtn.disabled = false;
+        hintInput.disabled = false;
+        hintBtn.disabled = false;
 
         // Set up frame callback to update game state display
         emulator.frameCallback = updateGameStateDisplay;
@@ -299,6 +321,25 @@ document.addEventListener('keydown', (e) => {
     if (button && agent) {
         agent.manualButton(button);
         e.preventDefault();
+    }
+});
+
+// Hint input handling
+function sendHint() {
+    const hint = hintInput.value.trim();
+    if (hint && agent) {
+        agent.setUserHint(hint);
+        hintStatus.textContent = `Hint sent: "${hint}"`;
+        hintStatus.classList.add('active');
+        hintInput.value = '';
+        statusText.textContent = 'Hint received! Agent will follow your guidance.';
+    }
+}
+
+hintBtn.addEventListener('click', sendHint);
+hintInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+        sendHint();
     }
 });
 

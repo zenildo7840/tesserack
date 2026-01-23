@@ -304,3 +304,79 @@ h3 {
 .turbo-a:active {
     background: #c0392b;
 }
+
+/* Hint panel */
+.hint-panel {
+    background: #16213e;
+    border-radius: 10px;
+    padding: 15px;
+}
+
+.hint-input-row {
+    display: flex;
+    gap: 10px;
+}
+
+.hint-input-row input {
+    flex: 1;
+    padding: 10px 12px;
+    border: 2px solid #333;
+    border-radius: 5px;
+    background: #0f0f1a;
+    color: #fff;
+    font-family: inherit;
+    font-size: 13px;
+}
+
+.hint-input-row input:focus {
+    outline: none;
+    border-color: #4ecdc4;
+}
+
+.hint-input-row input:disabled {
+    opacity: 0.5;
+}
+
+.hint-input-row button {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 5px;
+    background: #ff6b6b;
+    color: #fff;
+    font-family: inherit;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.hint-input-row button:hover:not(:disabled) {
+    background: #ff8787;
+}
+
+.hint-input-row button:disabled {
+    background: #333;
+    color: #666;
+    cursor: not-allowed;
+}
+
+.hint-status {
+    margin-top: 10px;
+    padding: 8px;
+    font-size: 12px;
+    color: #888;
+    border-radius: 5px;
+    min-height: 20px;
+}
+
+.hint-status.active {
+    background: #2d4a3e;
+    color: #4ecdc4;
+}
+
+.objective {
+    padding: 8px;
+    margin-bottom: 10px;
+    background: #0f0f1a;
+    border-radius: 5px;
+    font-size: 12px;
+    color: #ff6b6b;
+}

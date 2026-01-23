@@ -152,6 +152,8 @@ export class GameAgent {
         // Conversation history for context (last 10 exchanges)
         this.history = [];
         this.maxHistoryLength = 10;
+        // User hint for guiding the agent
+        this.userHint = null;
     }
 
     /**
@@ -172,6 +174,35 @@ export class GameAgent {
     }
 
     /**
+     * Set a hint from the user to guide the agent
+     * @param {string} hint - User's guidance message
+     */
+    setUserHint(hint) {
+        this.userHint = hint && hint.trim() ? hint.trim() : null;
+        this.hintUsageCount = 0;
+        // Clear history when user gives new direction (fresh start)
+        if (this.userHint) {
+            this.clearHistory();
+        }
+    }
+
+    /**
+     * Clear the current user hint
+     */
+    clearUserHint() {
+        this.userHint = null;
+        this.hintUsageCount = 0;
+    }
+
+    /**
+     * Get current user hint
+     * @returns {string|null}
+     */
+    getUserHint() {
+        return this.userHint;
+    }
+
+    /**
      * Build the user message with current game state
      * @param {Object} state - Game state from memory reader
      * @returns {string}
@@ -179,6 +210,13 @@ export class GameAgent {
     buildUserMessage(state) {
         const objective = getObjective(state);
         const lines = [];
+
+        // User hint takes priority if present
+        if (this.userHint) {
+            lines.push(`USER INSTRUCTION: ${this.userHint}`);
+            lines.push('(Follow this instruction from the player!)');
+            lines.push('');
+        }
 
         // Current objective
         lines.push(`CURRENT OBJECTIVE: ${objective.description}`);
@@ -263,6 +301,15 @@ export class GameAgent {
             // Add to conversation history
             this.addToHistory(userMessage, response);
 
+            // Track hint usage - auto-clear after 5 LLM calls
+            if (this.userHint) {
+                this.hintUsageCount = (this.hintUsageCount || 0) + 1;
+                if (this.hintUsageCount >= 5) {
+                    this.userHint = null;
+                    this.hintUsageCount = 0;
+                }
+            }
+
             // Filter out excessive menu actions and queue
             this.actionQueue = filterActions(actions);
 
@@ -271,6 +318,8 @@ export class GameAgent {
                     action: actions,
                     reasoning: plan,
                     objective: objective.description,
+                    userHint: this.userHint,
+                    hintRemaining: this.userHint ? (5 - this.hintUsageCount) : 0,
                     state
                 });
             }

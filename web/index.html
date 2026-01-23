@@ -57,10 +57,20 @@
 
                 <div class="reasoning-panel">
                     <h3>LLM Reasoning</h3>
+                    <div id="objective" class="objective">-</div>
                     <div id="reasoning">-</div>
                     <div class="action-display">
                         <strong>Actions:</strong> <span id="actions">-</span>
                     </div>
+                </div>
+
+                <div class="hint-panel">
+                    <h3>Guide the AI</h3>
+                    <div class="hint-input-row">
+                        <input type="text" id="hint-input" placeholder="e.g., Go north to Viridian City" disabled>
+                        <button id="hint-btn" disabled>Send</button>
+                    </div>
+                    <div id="hint-status" class="hint-status"></div>
                 </div>
             </div>
         </main>
