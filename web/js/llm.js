@@ -63,3 +63,28 @@ export async function generate(prompt, maxTokens = 256) {
 export function isReady() {
     return engine !== null;
 }
+
+/**
+ * Reset the chat context to free memory
+ * Call this periodically to prevent memory buildup
+ */
+export async function resetContext() {
+    if (engine) {
+        try {
+            await engine.resetChat();
+            console.log('LLM context reset');
+        } catch (err) {
+            console.warn('Failed to reset LLM context:', err);
+        }
+    }
+}
+
+/**
+ * Get engine stats for debugging
+ */
+export function getStats() {
+    if (engine && engine.stats) {
+        return engine.stats();
+    }
+    return null;
+}

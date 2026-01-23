@@ -1,6 +1,10 @@
 // agent.js - Game agent that coordinates LLM and emulator
-import { chat } from './llm.js';
+import { chat, resetContext } from './llm.js';
 import { parseResponse } from './action-parser.js';
+
+// LLM call counter for periodic memory cleanup
+let llmCallCount = 0;
+const RESET_CONTEXT_EVERY = 30; // Reset LLM context every N calls to free memory
 
 const SYSTEM_PROMPT = `You are an expert AI playing Pokemon Red. Your ultimate goal is to become the Pokemon Champion.
 
@@ -83,14 +87,19 @@ const OBJECTIVES = {
 let startCooldown = 0;
 const START_COOLDOWN_CALLS = 10; // Only allow start once every 10 LLM calls
 
+// Track recent actions to detect stuck behavior
+let recentActions = [];
+const STUCK_THRESHOLD = 15; // If same action repeated this many times, we're stuck
+
 /**
- * Filter actions to reduce menu spam
+ * Filter actions to reduce menu spam and prevent getting stuck
  * @param {string[]} actions - Raw actions from LLM
  * @param {boolean} inBattle - Whether currently in battle
  * @returns {string[]} - Filtered actions
  */
 function filterActions(actions, inBattle = false) {
     const filtered = [];
+    const movements = ['up', 'down', 'left', 'right'];
 
     for (const action of actions) {
         const btn = action.toLowerCase();
@@ -98,9 +107,7 @@ function filterActions(actions, inBattle = false) {
         // Block start almost entirely (unless in battle where it might be needed)
         if (btn === 'start') {
             if (!inBattle && startCooldown > 0) {
-                // Replace with 'b' to help escape menus
-                filtered.push('b');
-                continue;
+                continue; // Just skip it, don't replace with b
             }
             startCooldown = START_COOLDOWN_CALLS;
         }
@@ -110,13 +117,35 @@ function filterActions(actions, inBattle = false) {
             continue;
         }
 
-        filtered.push(action);
+        filtered.push(btn);
     }
 
     // Decrement cooldown
     if (startCooldown > 0) startCooldown--;
 
+    // Check for stuck behavior - if we'd be repeating too much, inject random movement
+    const wouldBeStuck = filtered.length > 0 &&
+        recentActions.length >= STUCK_THRESHOLD &&
+        recentActions.slice(-STUCK_THRESHOLD).every(a => a === filtered[0]);
+
+    if (wouldBeStuck) {
+        // Force a random movement to break out of stuck state
+        const randomMove = movements[Math.floor(Math.random() * movements.length)];
+        return [randomMove, randomMove, 'a', randomMove, randomMove];
+    }
+
     return filtered;
+}
+
+/**
+ * Track an executed action for stuck detection
+ */
+function trackAction(action) {
+    recentActions.push(action.toLowerCase());
+    // Keep only last 30 actions
+    if (recentActions.length > 30) {
+        recentActions.shift();
+    }
 }
 
 function getObjective(state) {
@@ -159,9 +188,9 @@ export class GameAgent {
         this.manualOverrideUntil = 0;
         this.stepCount = 0;
         this.actionQueue = [];
-        // Conversation history for context (last 10 exchanges)
+        // Conversation history for context (reduced to 5 for performance)
         this.history = [];
-        this.maxHistoryLength = 10;
+        this.maxHistoryLength = 5;
         // User hint for guiding the agent
         this.userHint = null;
     }
@@ -278,6 +307,7 @@ export class GameAgent {
         if (this.actionQueue.length > 0) {
             const action = this.actionQueue.shift();
             this.emu.pressButton(action);
+            trackAction(action); // Track for stuck detection
             this.stepCount++;
 
             // Autosave every 50 steps
@@ -304,6 +334,13 @@ export class GameAgent {
         const objective = getObjective(state);
 
         try {
+            // Periodic memory cleanup
+            llmCallCount++;
+            if (llmCallCount % RESET_CONTEXT_EVERY === 0) {
+                await resetContext();
+                this.clearHistory(); // Also clear our history
+            }
+
             // Use chat() with system prompt, history, and current state
             const response = await chat(SYSTEM_PROMPT, this.history, userMessage, 256);
             const { plan, actions } = parseResponse(response);
@@ -352,7 +389,8 @@ export class GameAgent {
             }
 
             await this.step();
-            await this.sleep(100);
+            // Increased delay between actions for better performance
+            await this.sleep(150);
         }
     }
 
