@@ -5,7 +5,13 @@ const SETTINGS_KEY = 'tesserack-settings';
 export function saveState(emulator) {
     try {
         const state = emulator.saveState();
-        const encoded = btoa(String.fromCharCode(...state));
+        // Convert Uint8Array to base64 without spread operator (avoids stack overflow for large arrays)
+        let binary = '';
+        const len = state.length;
+        for (let i = 0; i < len; i++) {
+            binary += String.fromCharCode(state[i]);
+        }
+        const encoded = btoa(binary);
         localStorage.setItem(SAVE_KEY, encoded);
         return true;
     } catch (err) {
