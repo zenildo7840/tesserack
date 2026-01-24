@@ -534,6 +534,39 @@ export function setButton(button, pressed) {
     emu.setButton(button, pressed);
 }
 
+// ============ AUDIO CONTROL ============
+
+/**
+ * Initialize audio (must be called from user gesture)
+ */
+export async function initAudio() {
+    if (!emu) return false;
+    return await emu.initAudio();
+}
+
+/**
+ * Enable/disable audio
+ */
+export function setAudioEnabled(enabled) {
+    if (!emu) return;
+    emu.setAudioEnabled(enabled);
+}
+
+/**
+ * Set audio volume (0.0 - 1.0)
+ */
+export function setVolume(volume) {
+    if (!emu) return;
+    emu.setVolume(volume);
+}
+
+/**
+ * Check if audio is enabled
+ */
+export function isAudioEnabled() {
+    return emu?.audioEnabled || false;
+}
+
 // ============ TRAINING CONTROL ============
 
 /**

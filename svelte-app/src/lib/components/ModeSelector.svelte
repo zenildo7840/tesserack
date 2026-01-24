@@ -2,8 +2,24 @@
     import { activeMode } from '$lib/stores/agent';
     import { stats } from '$lib/stores/agent';
     import { modelState, trainingProgress } from '$lib/stores/training';
-    import { startWatchMode, stopAll, saveGame, loadGame } from '$lib/core/game-init.js';
-    import { Play, Pause, Square, Save, FolderOpen, Zap } from 'lucide-svelte';
+    import { startWatchMode, stopAll, saveGame, loadGame, initAudio, setAudioEnabled, isAudioEnabled } from '$lib/core/game-init.js';
+    import { Play, Pause, Square, Save, FolderOpen, Zap, Volume2, VolumeX } from 'lucide-svelte';
+
+    let audioEnabled = false;
+
+    async function toggleAudio() {
+        if (!audioEnabled) {
+            // First time - need to initialize from user gesture
+            const success = await initAudio();
+            if (success) {
+                audioEnabled = true;
+                setAudioEnabled(true);
+            }
+        } else {
+            audioEnabled = false;
+            setAudioEnabled(false);
+        }
+    }
 
     function togglePlay() {
         if ($activeMode === 'idle') {
@@ -103,7 +119,7 @@
         </div>
     </div>
 
-    <!-- Utility Controls: Save/Load -->
+    <!-- Utility Controls: Save/Load/Audio -->
     <div class="utility-controls">
         <button class="util-btn" on:click={handleSave} title="Save game state">
             <Save size={16} />
@@ -112,6 +128,18 @@
         <button class="util-btn" on:click={handleLoad} title="Load saved game">
             <FolderOpen size={16} />
             <span>Load</span>
+        </button>
+        <button
+            class="util-btn"
+            class:active={audioEnabled}
+            on:click={toggleAudio}
+            title={audioEnabled ? 'Mute audio' : 'Enable audio'}
+        >
+            {#if audioEnabled}
+                <Volume2 size={16} />
+            {:else}
+                <VolumeX size={16} />
+            {/if}
         </button>
     </div>
 </div>
@@ -313,5 +341,14 @@
 
     .util-btn:active {
         transform: scale(0.98);
+    }
+
+    .util-btn.active {
+        background: var(--accent-primary);
+        color: white;
+    }
+
+    .util-btn.active:hover {
+        background: #5fa8eb;
     }
 </style>

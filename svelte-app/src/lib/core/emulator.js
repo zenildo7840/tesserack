@@ -80,6 +80,12 @@ export class Emulator {
             up: false, down: false, left: false, right: false,
             a: false, b: false, start: false, select: false
         };
+
+        // Audio state
+        this.audioCtx = null;
+        this.audioBuffer = null;
+        this.audioEnabled = false;
+        this.audioVolume = 0.5;
     }
 
     /**
@@ -156,7 +162,92 @@ export class Emulator {
         // Set a nice default palette (palette 79 is a common choice)
         this.module._emulator_set_builtin_palette(this.e, 79);
 
+        // Set up audio buffer access
+        const audioBufferPtr = this.module._get_audio_buffer_ptr(this.e);
+        const audioBufferCapacity = this.module._get_audio_buffer_capacity(this.e);
+        this.audioBuffer = makeWasmBuffer(this.module, audioBufferPtr, audioBufferCapacity * 4); // 2 channels * 2 bytes per sample
+
         return true;
+    }
+
+    /**
+     * Initialize Web Audio API
+     * Must be called from a user gesture (click/keypress)
+     */
+    async initAudio() {
+        if (this.audioCtx) return true;
+
+        try {
+            this.audioCtx = new (window.AudioContext || window.webkitAudioContext)({
+                sampleRate: 44100
+            });
+
+            // Create gain node for volume control
+            this.gainNode = this.audioCtx.createGain();
+            this.gainNode.gain.value = this.audioVolume;
+            this.gainNode.connect(this.audioCtx.destination);
+
+            // Resume if suspended (required by autoplay policy)
+            if (this.audioCtx.state === 'suspended') {
+                await this.audioCtx.resume();
+            }
+
+            this.audioEnabled = true;
+            console.log('Audio initialized');
+            return true;
+        } catch (e) {
+            console.error('Failed to initialize audio:', e);
+            return false;
+        }
+    }
+
+    /**
+     * Enable/disable audio
+     */
+    setAudioEnabled(enabled) {
+        this.audioEnabled = enabled;
+        if (this.audioCtx) {
+            if (enabled) {
+                this.audioCtx.resume();
+            } else {
+                this.audioCtx.suspend();
+            }
+        }
+    }
+
+    /**
+     * Set audio volume (0.0 - 1.0)
+     */
+    setVolume(volume) {
+        this.audioVolume = Math.max(0, Math.min(1, volume));
+        if (this.gainNode) {
+            this.gainNode.gain.value = this.audioVolume;
+        }
+    }
+
+    /**
+     * Play audio buffer
+     */
+    playAudioBuffer() {
+        if (!this.audioCtx || !this.audioEnabled || !this.audioBuffer) return;
+
+        // Create buffer for this chunk
+        const buffer = this.audioCtx.createBuffer(2, AUDIO_FRAMES, 44100);
+        const left = buffer.getChannelData(0);
+        const right = buffer.getChannelData(1);
+
+        // Convert from interleaved i16 to float
+        const view = new Int16Array(this.audioBuffer.buffer, this.audioBuffer.byteOffset, AUDIO_FRAMES * 2);
+        for (let i = 0; i < AUDIO_FRAMES; i++) {
+            left[i] = view[i * 2] / 32768;
+            right[i] = view[i * 2 + 1] / 32768;
+        }
+
+        // Play immediately
+        const source = this.audioCtx.createBufferSource();
+        source.buffer = buffer;
+        source.connect(this.gainNode);
+        source.start();
     }
 
     /**
@@ -229,6 +320,12 @@ export class Emulator {
     runUntil(ticks) {
         while (true) {
             const event = this.module._emulator_run_until_f64(this.e, ticks);
+
+            // Handle audio buffer full
+            if (event & EVENT_AUDIO_BUFFER_FULL) {
+                this.playAudioBuffer();
+            }
+
             if (event & EVENT_UNTIL_TICKS) {
                 break;
             }
@@ -496,6 +593,12 @@ export class Emulator {
      */
     destroy() {
         this.stop();
+
+        // Clean up audio
+        if (this.audioCtx) {
+            this.audioCtx.close();
+            this.audioCtx = null;
+        }
 
         if (this.joypadBufferPtr) {
             this.module._joypad_delete(this.joypadBufferPtr);
