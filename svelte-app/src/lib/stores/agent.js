@@ -12,9 +12,11 @@ export const dataCollector = writable(null);
 // AI reasoning state
 export const aiState = writable({
     objective: '',
+    objectiveHint: '',
     reasoning: '',
     actions: [],
     planSource: '', // 'llm' | 'neural-policy' | 'exploration'
+    gameState: null, // Current game state for visibility
 });
 
 // Statistics

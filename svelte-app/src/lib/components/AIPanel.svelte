@@ -1,9 +1,11 @@
 <script>
     import { activeMode, aiState, stats } from '$lib/stores/agent';
     import { trainingProgress } from '$lib/stores/training';
-    import { Brain, Sparkles, Target, Zap, ArrowRight } from 'lucide-svelte';
+    import { Brain, Sparkles, Target, Zap, ArrowRight, ChevronDown, ChevronUp, Eye, Lightbulb } from 'lucide-svelte';
 
     $: isRunning = $activeMode !== 'idle';
+
+    let showGameState = false;
 
     // Parse reasoning into plan and status
     $: parsedReasoning = parseReasoning($aiState.reasoning);
@@ -85,7 +87,15 @@
         {#if $aiState.objective}
             <div class="objective-row">
                 <Target size={14} class="objective-icon" />
-                <span class="objective-text">{$aiState.objective}</span>
+                <div class="objective-content">
+                    <span class="objective-text">{$aiState.objective}</span>
+                    {#if $aiState.objectiveHint}
+                        <div class="objective-hint">
+                            <Lightbulb size={12} />
+                            <span>{$aiState.objectiveHint}</span>
+                        </div>
+                    {/if}
+                </div>
             </div>
         {/if}
 
@@ -125,6 +135,52 @@
             <div class="source">
                 via <span class="source-name">{$aiState.planSource}</span>
             </div>
+        {/if}
+
+        <!-- Collapsible game state view -->
+        {#if $aiState.gameState}
+            <button class="state-toggle" on:click={() => showGameState = !showGameState}>
+                <Eye size={12} />
+                <span>What LLM Sees</span>
+                {#if showGameState}
+                    <ChevronUp size={12} />
+                {:else}
+                    <ChevronDown size={12} />
+                {/if}
+            </button>
+
+            {#if showGameState}
+                <div class="game-state-box">
+                    <div class="state-row">
+                        <span class="state-label">Location</span>
+                        <span class="state-value">{$aiState.gameState.location}</span>
+                    </div>
+                    <div class="state-row">
+                        <span class="state-label">Coords</span>
+                        <span class="state-value">({$aiState.gameState.coordinates?.x}, {$aiState.gameState.coordinates?.y})</span>
+                    </div>
+                    {#if $aiState.gameState.party?.length > 0}
+                        <div class="state-row">
+                            <span class="state-label">Party</span>
+                            <span class="state-value">
+                                {$aiState.gameState.party.map(p => `${p.species} Lv${p.level}`).join(', ')}
+                            </span>
+                        </div>
+                    {/if}
+                    {#if $aiState.gameState.inBattle}
+                        <div class="state-row battle">
+                            <span class="state-label">Status</span>
+                            <span class="state-value">IN BATTLE</span>
+                        </div>
+                    {/if}
+                    {#if $aiState.gameState.dialog}
+                        <div class="state-row">
+                            <span class="state-label">Dialog</span>
+                            <span class="state-value dialog">"{$aiState.gameState.dialog}"</span>
+                        </div>
+                    {/if}
+                </div>
+            {/if}
         {/if}
 
     {:else}
@@ -218,11 +274,32 @@
         margin-top: 2px;
     }
 
+    .objective-content {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+
     .objective-text {
         font-size: 13px;
         font-weight: 500;
         color: var(--text-primary);
         line-height: 1.4;
+    }
+
+    .objective-hint {
+        display: flex;
+        align-items: flex-start;
+        gap: 6px;
+        font-size: 12px;
+        color: var(--text-muted);
+        line-height: 1.4;
+    }
+
+    .objective-hint :global(svg) {
+        flex-shrink: 0;
+        margin-top: 2px;
+        color: #fdcb6e;
     }
 
     .plan-box {
@@ -378,5 +455,67 @@
         font-size: 12px;
         color: var(--text-muted);
         margin: 0;
+    }
+
+    .state-toggle {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        width: 100%;
+        padding: 8px 0;
+        margin-top: 8px;
+        background: transparent;
+        border: none;
+        border-top: 1px solid var(--border-color);
+        color: var(--text-muted);
+        font-size: 11px;
+        cursor: pointer;
+        transition: color 0.2s;
+    }
+
+    .state-toggle:hover {
+        color: var(--text-secondary);
+    }
+
+    .game-state-box {
+        background: var(--bg-dark);
+        border-radius: var(--border-radius-sm);
+        padding: 10px;
+        margin-top: 8px;
+        font-size: 11px;
+    }
+
+    .state-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 4px 0;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .state-row:last-child {
+        border-bottom: none;
+    }
+
+    .state-row.battle {
+        color: var(--accent-secondary);
+    }
+
+    .state-label {
+        color: var(--text-muted);
+        font-weight: 500;
+    }
+
+    .state-value {
+        color: var(--text-secondary);
+        text-align: right;
+        max-width: 60%;
+    }
+
+    .state-value.dialog {
+        font-style: italic;
+        font-size: 10px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
 </style>

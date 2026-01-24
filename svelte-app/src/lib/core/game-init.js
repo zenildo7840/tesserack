@@ -277,9 +277,11 @@ function updateGameStateFromMemory() {
 function handleAgentUpdate(update) {
     updateAIState({
         objective: update.objective || '',
+        objectiveHint: update.objectiveHint || '',
         reasoning: update.reasoning || '',
         actions: update.action || [],
-        planSource: update.selected || 'llm'
+        planSource: update.selected || 'llm',
+        gameState: update.gameState || null
     });
 
     if (update.state) {

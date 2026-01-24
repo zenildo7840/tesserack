@@ -365,9 +365,18 @@ export class GameAgent {
                     action: actions,
                     reasoning: plan,
                     objective: objective.description,
+                    objectiveHint: objective.hint,
                     userHint: this.userHint,
                     hintRemaining: this.userHint ? (5 - this.hintUsageCount) : 0,
-                    state
+                    state,
+                    gameState: {
+                        location: state.location,
+                        coordinates: state.coordinates,
+                        party: state.party,
+                        badges: state.badges,
+                        inBattle: state.inBattle,
+                        dialog: state.dialog
+                    }
                 });
             }
         } catch (err) {
