@@ -193,6 +193,35 @@ export class GameAgent {
         this.maxHistoryLength = 5;
         // User hint for guiding the agent
         this.userHint = null;
+        // Objective override (persistent until cleared)
+        this.objectiveOverride = null;
+    }
+
+    /**
+     * Set a persistent objective override
+     * @param {string} objective - Custom objective to use instead of auto-detected
+     */
+    setObjectiveOverride(objective) {
+        this.objectiveOverride = objective && objective.trim() ? objective.trim() : null;
+        // Clear history when objective changes (fresh start)
+        if (this.objectiveOverride) {
+            this.clearHistory();
+        }
+    }
+
+    /**
+     * Clear the objective override, returning to auto-detection
+     */
+    clearObjectiveOverride() {
+        this.objectiveOverride = null;
+    }
+
+    /**
+     * Get current objective override
+     * @returns {string|null}
+     */
+    getObjectiveOverride() {
+        return this.objectiveOverride;
     }
 
     /**
@@ -247,7 +276,7 @@ export class GameAgent {
      * @returns {string}
      */
     buildUserMessage(state) {
-        const objective = getObjective(state);
+        const autoObjective = getObjective(state);
         const lines = [];
 
         // User hint takes priority if present
@@ -257,9 +286,14 @@ export class GameAgent {
             lines.push('');
         }
 
-        // Current objective
-        lines.push(`CURRENT OBJECTIVE: ${objective.description}`);
-        lines.push(`HINT: ${objective.hint}`);
+        // Use override objective if set, otherwise auto-detected
+        if (this.objectiveOverride) {
+            lines.push(`CURRENT OBJECTIVE: ${this.objectiveOverride}`);
+            lines.push('(Custom objective set by player)');
+        } else {
+            lines.push(`CURRENT OBJECTIVE: ${autoObjective.description}`);
+            lines.push(`HINT: ${autoObjective.hint}`);
+        }
         lines.push('');
 
         // Game state
@@ -361,11 +395,16 @@ export class GameAgent {
             this.actionQueue = filterActions(actions, state.inBattle);
 
             if (this.onUpdate) {
+                // Use override objective if set
+                const displayObjective = this.objectiveOverride || objective.description;
+                const displayHint = this.objectiveOverride ? null : objective.hint;
+
                 this.onUpdate({
                     action: actions,
                     reasoning: plan,
-                    objective: objective.description,
-                    objectiveHint: objective.hint,
+                    objective: displayObjective,
+                    objectiveHint: displayHint,
+                    objectiveOverrideActive: !!this.objectiveOverride,
                     userHint: this.userHint,
                     hintRemaining: this.userHint ? (5 - this.hintUsageCount) : 0,
                     state,

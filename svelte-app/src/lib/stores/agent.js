@@ -13,6 +13,7 @@ export const dataCollector = writable(null);
 export const aiState = writable({
     objective: '',
     objectiveHint: '',
+    objectiveOverrideActive: false,
     reasoning: '',
     actions: [],
     planSource: '', // 'llm' | 'neural-policy' | 'exploration'
@@ -28,9 +29,20 @@ export const stats = writable({
     humanDemos: 0,
 });
 
-// User hint
+// User hint (temporary, expires after N calls)
 export const userHint = writable('');
 export const hintRemaining = writable(0);
+
+// Objective override (persistent until cleared)
+export const objectiveOverride = writable('');
+
+export function setObjectiveOverride(objective) {
+    objectiveOverride.set(objective || '');
+}
+
+export function clearObjectiveOverride() {
+    objectiveOverride.set('');
+}
 
 // Is agent running?
 export const isRunning = derived(activeMode, $mode => $mode !== 'idle' && $mode !== 'manual');

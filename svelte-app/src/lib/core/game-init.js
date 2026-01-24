@@ -278,6 +278,7 @@ function handleAgentUpdate(update) {
     updateAIState({
         objective: update.objective || '',
         objectiveHint: update.objectiveHint || '',
+        objectiveOverrideActive: update.objectiveOverrideActive || false,
         reasoning: update.reasoning || '',
         actions: update.action || [],
         planSource: update.selected || 'llm',
@@ -534,6 +535,26 @@ export function pressButton(button) {
 export function setButton(button, pressed) {
     if (!emu) return;
     emu.setButton(button, pressed);
+}
+
+// ============ OBJECTIVE OVERRIDE ============
+
+/**
+ * Set a custom objective override for the agent
+ */
+export function setObjectiveOverride(objective) {
+    if (agent) {
+        agent.setObjectiveOverride(objective);
+    }
+}
+
+/**
+ * Clear the objective override, returning to auto-detection
+ */
+export function clearObjectiveOverride() {
+    if (agent) {
+        agent.clearObjectiveOverride();
+    }
 }
 
 // ============ AUDIO CONTROL ============

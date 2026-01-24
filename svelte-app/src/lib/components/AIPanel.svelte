@@ -1,11 +1,44 @@
 <script>
-    import { activeMode, aiState, stats } from '$lib/stores/agent';
+    import { activeMode, aiState, stats, objectiveOverride } from '$lib/stores/agent';
     import { trainingProgress } from '$lib/stores/training';
-    import { Brain, Sparkles, Target, Zap, ArrowRight, ChevronDown, ChevronUp, Eye, Lightbulb } from 'lucide-svelte';
+    import { setObjectiveOverride, clearObjectiveOverride } from '$lib/core/game-init.js';
+    import { Brain, Sparkles, Target, Zap, ArrowRight, ChevronDown, ChevronUp, Eye, Lightbulb, Edit3, X } from 'lucide-svelte';
 
     $: isRunning = $activeMode !== 'idle';
 
     let showGameState = false;
+    let editingObjective = false;
+    let customObjective = '';
+
+    function startEditObjective() {
+        customObjective = $objectiveOverride || $aiState.objective || '';
+        editingObjective = true;
+    }
+
+    function saveObjective() {
+        if (customObjective.trim()) {
+            setObjectiveOverride(customObjective.trim());
+        }
+        editingObjective = false;
+    }
+
+    function cancelEdit() {
+        editingObjective = false;
+        customObjective = '';
+    }
+
+    function clearOverride() {
+        clearObjectiveOverride();
+        objectiveOverride.set('');
+    }
+
+    function handleKeypress(e) {
+        if (e.key === 'Enter') {
+            saveObjective();
+        } else if (e.key === 'Escape') {
+            cancelEdit();
+        }
+    }
 
     // Parse reasoning into plan and status
     $: parsedReasoning = parseReasoning($aiState.reasoning);
@@ -84,12 +117,37 @@
             {/if}
         </div>
 
-        {#if $aiState.objective}
-            <div class="objective-row">
+        {#if editingObjective}
+            <div class="objective-edit">
+                <input
+                    type="text"
+                    bind:value={customObjective}
+                    on:keydown={handleKeypress}
+                    placeholder="Enter custom objective..."
+                    autofocus
+                />
+                <div class="edit-actions">
+                    <button class="btn-save" on:click={saveObjective}>Save</button>
+                    <button class="btn-cancel" on:click={cancelEdit}>Cancel</button>
+                </div>
+            </div>
+        {:else if $aiState.objective}
+            <div class="objective-row" class:override={$aiState.objectiveOverrideActive}>
                 <Target size={14} class="objective-icon" />
                 <div class="objective-content">
-                    <span class="objective-text">{$aiState.objective}</span>
-                    {#if $aiState.objectiveHint}
+                    <div class="objective-header">
+                        <span class="objective-text">{$aiState.objective}</span>
+                        {#if $aiState.objectiveOverrideActive}
+                            <span class="override-badge">CUSTOM</span>
+                            <button class="btn-icon" on:click={clearOverride} title="Clear override">
+                                <X size={12} />
+                            </button>
+                        {/if}
+                        <button class="btn-icon edit-btn" on:click={startEditObjective} title="Set custom objective">
+                            <Edit3 size={12} />
+                        </button>
+                    </div>
+                    {#if $aiState.objectiveHint && !$aiState.objectiveOverrideActive}
                         <div class="objective-hint">
                             <Lightbulb size={12} />
                             <span>{$aiState.objectiveHint}</span>
@@ -97,6 +155,11 @@
                     {/if}
                 </div>
             </div>
+        {:else}
+            <button class="set-objective-btn" on:click={startEditObjective}>
+                <Target size={14} />
+                <span>Set Custom Objective</span>
+            </button>
         {/if}
 
         <div class="plan-box">
@@ -272,6 +335,139 @@
         color: var(--accent-primary);
         flex-shrink: 0;
         margin-top: 2px;
+    }
+
+    .objective-row.override {
+        border-left-color: #fdcb6e;
+        background: rgba(253, 203, 110, 0.1);
+    }
+
+    .objective-row.override :global(.objective-icon) {
+        color: #fdcb6e;
+    }
+
+    .objective-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+
+    .override-badge {
+        font-size: 9px;
+        font-weight: 700;
+        padding: 2px 6px;
+        background: #fdcb6e;
+        color: #1a1a2e;
+        border-radius: 3px;
+        letter-spacing: 0.5px;
+    }
+
+    .btn-icon {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 4px;
+        background: transparent;
+        border: none;
+        color: var(--text-muted);
+        cursor: pointer;
+        border-radius: 4px;
+        transition: all 0.2s;
+    }
+
+    .btn-icon:hover {
+        background: var(--bg-input);
+        color: var(--text-primary);
+    }
+
+    .edit-btn {
+        margin-left: auto;
+        opacity: 0;
+        transition: opacity 0.2s;
+    }
+
+    .objective-row:hover .edit-btn {
+        opacity: 1;
+    }
+
+    .objective-edit {
+        background: var(--bg-input);
+        border-radius: var(--border-radius-sm);
+        padding: 12px;
+        margin-bottom: 12px;
+    }
+
+    .objective-edit input {
+        width: 100%;
+        padding: 10px 12px;
+        font-size: 13px;
+        background: var(--bg-dark);
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        color: var(--text-primary);
+        margin-bottom: 10px;
+    }
+
+    .objective-edit input:focus {
+        outline: none;
+        border-color: var(--accent-primary);
+    }
+
+    .edit-actions {
+        display: flex;
+        gap: 8px;
+    }
+
+    .btn-save {
+        padding: 6px 14px;
+        background: var(--accent-primary);
+        color: white;
+        border: none;
+        border-radius: 4px;
+        font-size: 12px;
+        font-weight: 500;
+        cursor: pointer;
+    }
+
+    .btn-save:hover {
+        opacity: 0.9;
+    }
+
+    .btn-cancel {
+        padding: 6px 14px;
+        background: transparent;
+        color: var(--text-muted);
+        border: 1px solid var(--border-color);
+        border-radius: 4px;
+        font-size: 12px;
+        cursor: pointer;
+    }
+
+    .btn-cancel:hover {
+        color: var(--text-primary);
+        border-color: var(--text-muted);
+    }
+
+    .set-objective-btn {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        width: 100%;
+        padding: 12px;
+        margin-bottom: 12px;
+        background: var(--bg-input);
+        border: 1px dashed var(--border-color);
+        border-radius: var(--border-radius-sm);
+        color: var(--text-muted);
+        font-size: 13px;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .set-objective-btn:hover {
+        border-color: var(--accent-primary);
+        color: var(--accent-primary);
     }
 
     .objective-content {
