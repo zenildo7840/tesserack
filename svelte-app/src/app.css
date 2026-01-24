@@ -1,5 +1,6 @@
-/* Global styles for Tesserack - Light Sketchpad Theme */
-:root {
+/* Global styles for Tesserack - Theming */
+:root,
+[data-theme="light"] {
     --bg-cream: #faf8f5;
     --bg-panel: #ffffff;
     --bg-input: #f5f3f0;
@@ -17,6 +18,24 @@
     --shadow-medium: 0 4px 12px rgba(0, 0, 0, 0.08);
     --border-radius: 12px;
     --border-radius-sm: 6px;
+}
+
+[data-theme="dark"] {
+    --bg-cream: #1c1917;
+    --bg-panel: #292524;
+    --bg-input: #3d3835;
+    --bg-dark: #0c0a09;
+    --text-primary: #fafaf9;
+    --text-secondary: #a8a29e;
+    --text-muted: #78716c;
+    --accent-primary: #74b9ff;
+    --accent-secondary: #ff7675;
+    --accent-success: #4ade80;
+    --accent-warning: #fbbf24;
+    --accent-purple: #c4b5fd;
+    --border-color: #44403c;
+    --shadow-soft: 0 2px 8px rgba(0, 0, 0, 0.4);
+    --shadow-medium: 0 4px 12px rgba(0, 0, 0, 0.5);
 }
 
 * {

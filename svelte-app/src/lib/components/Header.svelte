@@ -2,7 +2,8 @@
     import { modelState } from '$lib/stores/training';
     import { romLoaded } from '$lib/stores/game';
     import { llmState, tokenStats } from '$lib/stores/llm';
-    import { Cpu, CheckCircle, Info, Github, ChevronDown, ChevronUp, X, Zap } from 'lucide-svelte';
+    import { theme } from '$lib/stores/theme';
+    import { Cpu, CheckCircle, Info, Github, ChevronDown, ChevronUp, X, Zap, Sun, Moon } from 'lucide-svelte';
 
     let aboutOpen = false;
 
@@ -21,6 +22,14 @@
     </div>
 
     <div class="header-right">
+        <button class="theme-toggle" on:click={theme.toggle} title="Toggle dark mode">
+            {#if $theme === 'dark'}
+                <Sun size={18} />
+            {:else}
+                <Moon size={18} />
+            {/if}
+        </button>
+
         <button class="about-btn" on:click={() => aboutOpen = !aboutOpen}>
             <Info size={16} />
             <span>About</span>
@@ -301,5 +310,23 @@
     .github-link:hover {
         background: var(--border-color);
         text-decoration: none;
+    }
+
+    .theme-toggle {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 36px;
+        height: 36px;
+        padding: 0;
+        background: var(--bg-input);
+        color: var(--text-secondary);
+        border-radius: 8px;
+        transition: all 0.2s;
+    }
+
+    .theme-toggle:hover {
+        background: var(--bg-dark);
+        color: var(--accent-warning);
     }
 </style>
