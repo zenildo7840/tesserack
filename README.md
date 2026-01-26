@@ -1,48 +1,97 @@
 # Tesserack
 
-Browser-based AI that learns to play Pokemon Red. No server required.
+AI Plays Pokemon.
 
 [![Live Demo](https://img.shields.io/badge/demo-live-brightgreen)](https://sidmohan0.github.io/tesserack/)
 
 ## Overview
 
-Tesserack combines an LLM (Qwen2.5-1.5B via WebGPU), a trainable policy network (TensorFlow.js), and a GameBoy emulator (binjgb/WASM) to play Pokemon Red entirely client-side.
+Tesserack is a test bed for training small LLMs to play Pokemon Red. It uses a hierarchical approach: an LLM handles strategic planning while a policy network learns tactical execution.
 
-Objectives are sourced from Prima's Official Strategy Guide (1999) — 47 ordered checkpoints from Pallet Town to the Hall of Fame.
+**Two ways to use Tesserack:**
 
-## Requirements
+| | Browser | Lab |
+|---|---------|-----|
+| **Purpose** | Demo & casual use | Serious experimentation |
+| **Setup** | Zero (just open it) | Python environment |
+| **LLM** | WebLLM (1-3B) or API | Any (local or API) |
+| **Speed** | Real-time | 10x+ (headless) |
+| **Location** | `svelte-app/` | `lab/` |
 
-- Chrome/Edge 113+ (WebGPU)
-- Pokemon Red ROM (.gb)
+## Browser Version
 
-## Quick Start
+Zero-setup demo running entirely client-side via WebGPU.
 
 ```bash
-git clone https://github.com/sidmohan0/tesserack.git
-cd tesserack/svelte-app
+cd svelte-app
 npm install
 npm run dev
 ```
 
+**Requirements:** Chrome/Edge 113+ (WebGPU), Pokemon Red ROM
+
+**Features:**
+- LLM via WebLLM or external APIs (OpenAI, Groq, local)
+- Live policy network training
+- Full game state visibility
+
+## Lab (Python Test Bed)
+
+For running experiments, comparing models, and serious training.
+
+```bash
+cd lab
+pip install -r requirements.txt
+python scripts/run_experiment.py --rom pokemon_red.gb
+```
+
+**Requirements:** Python 3.10+, Pokemon Red ROM, Ollama (or other LLM backend)
+
+**Features:**
+- Headless execution at 10x+ speed
+- Swappable LLM backends
+- Full experiment logging and metrics
+- Configurable everything
+
+See [lab/README.md](lab/README.md) for details.
+
 ## Architecture
 
-| Component | Technology | Purpose |
-|-----------|------------|---------|
-| LLM | WebLLM (Qwen2.5-1.5B) | Action planning |
-| Policy Network | TensorFlow.js | Learned action selection |
-| Emulator | binjgb (WASM) | Game execution |
-| State | Direct RAM reading | Ground-truth game state |
-| Curriculum | Prima Guide (1999) | Structured objectives |
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     HIERARCHICAL LOOP                        │
+│                                                              │
+│   ┌─────────────┐         ┌─────────────┐                   │
+│   │     LLM     │  tasks  │   Policy    │  actions          │
+│   │  (Planner)  │────────▶│  (Executor) │─────────▶ Game    │
+│   └─────────────┘         └─────────────┘                   │
+│         ▲                       │                            │
+│         │                       │ learns                     │
+│         │   objective          ▼                            │
+│   ┌─────────────┐         ┌─────────────┐                   │
+│   │  Strategy   │         │ Experience  │                   │
+│   │   Guide     │         │   Buffer    │                   │
+│   └─────────────┘         └─────────────┘                   │
+└─────────────────────────────────────────────────────────────┘
+```
 
-## Storage
+**LLM Layer:** Issues task-level goals ("Navigate to Pewter City", "Train to level 14")
 
-All data persists locally: experiences and model weights in IndexedDB, game saves in localStorage, LLM weights in browser cache (~1.5GB).
+**Policy Layer:** Executes micro-actions to achieve tasks, learns from experience
+
+**The Harness:** Manages game state, detects task completion, logs everything
+
+## Current Goal
+
+Get a small LLM (3B parameters) to beat the first 2 gyms with the right harness design.
+
+- [ ] Brock (Boulder Badge)
+- [ ] Misty (Cascade Badge)
 
 ## Links
 
 - [Live Demo](https://sidmohan0.github.io/tesserack/)
-- [DataFog](https://datafog.ai)
-- [Threadfork](https://threadfork.com)
+- [Design Doc](docs/plans/2026-01-26-test-bed-harness-design.md)
 
 ## License
 
