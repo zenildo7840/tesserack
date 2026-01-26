@@ -16,10 +16,11 @@ class EmulatorConfig:
 
 @dataclass
 class LLMConfig:
-    backend: str = "ollama"  # "ollama" | "openai"
+    backend: str = "ollama"  # "ollama" | "openai" | "llamacpp"
     model: str = "llama3.2:3b"
     base_url: str = "http://localhost:11434"
     api_key: str = ""  # For OpenAI-compatible APIs
+    model_path: str = ""  # For llama.cpp: path to .gguf file
     temperature: float = 0.7
     max_tokens: int = 256
 

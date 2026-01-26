@@ -7,7 +7,7 @@ import time
 from .emulator import Emulator
 from .state import StateReader, GameState
 from .tasks import Task, TaskType, TaskStatus, TaskChecker, parse_task
-from .llm import Planner, OllamaBackend, OpenAIBackend, LLMConfig
+from .llm import Planner, OllamaBackend, OpenAIBackend, LlamaCppBackend, LLMConfig
 from .policy import PolicyNetwork, Experience, ACTION_TO_IDX
 from .metrics import MetricsLogger
 from .config import ExperimentConfig, CHECKPOINTS
@@ -58,6 +58,11 @@ class Harness:
             backend = OllamaBackend(llm_config)
         elif self.config.llm.backend == "openai":
             backend = OpenAIBackend(llm_config, self.config.llm.api_key)
+        elif self.config.llm.backend == "llamacpp":
+            backend = LlamaCppBackend(llm_config, self.config.llm.model_path)
+            # Optionally start server if not running
+            if self.config.llm.model_path:
+                backend.start_server()
         else:
             raise ValueError(f"Unknown LLM backend: {self.config.llm.backend}")
 

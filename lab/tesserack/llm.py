@@ -65,7 +65,7 @@ class OllamaBackend(LLMBackend):
 class OpenAIBackend(LLMBackend):
     """OpenAI-compatible API backend (works with OpenAI, Groq, Together, etc.)."""
 
-    def __init__(self, config: LLMConfig, api_key: str):
+    def __init__(self, config: LLMConfig, api_key: str = ""):
         self.config = config
         self.api_key = api_key
         try:
@@ -75,12 +75,13 @@ class OpenAIBackend(LLMBackend):
             raise ImportError("httpx not installed. Run: pip install httpx")
 
     def generate(self, prompt: str) -> str:
+        headers = {"Content-Type": "application/json"}
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
+
         response = self.client.post(
             f"{self.config.base_url}/chat/completions",
-            headers={
-                "Authorization": f"Bearer {self.api_key}",
-                "Content-Type": "application/json",
-            },
+            headers=headers,
             json={
                 "model": self.config.model,
                 "messages": [{"role": "user", "content": prompt}],
@@ -90,6 +91,80 @@ class OpenAIBackend(LLMBackend):
         )
         response.raise_for_status()
         return response.json()["choices"][0]["message"]["content"]
+
+
+class LlamaCppBackend(LLMBackend):
+    """llama.cpp server backend (e.g., from Threadfork).
+
+    The llama-server provides an OpenAI-compatible API.
+    Default endpoint: http://localhost:8080
+
+    To use with Threadfork's bundled server:
+        /Applications/threadfork.app/Contents/MacOS/llama-server \
+            -m "/path/to/model.gguf" \
+            --port 8080
+    """
+
+    THREADFORK_SERVER = "/Applications/threadfork.app/Contents/MacOS/llama-server"
+    THREADFORK_MODELS = "/Users/sid/Library/Application Support/ai.threadfork.app/models"
+
+    def __init__(self, config: LLMConfig, model_path: str = ""):
+        self.config = config
+        self.model_path = model_path
+        self.server_process = None
+        try:
+            import httpx
+            self.client = httpx.Client(timeout=120.0)
+        except ImportError:
+            raise ImportError("httpx not installed. Run: pip install httpx")
+
+    def generate(self, prompt: str) -> str:
+        response = self.client.post(
+            f"{self.config.base_url}/v1/chat/completions",
+            headers={"Content-Type": "application/json"},
+            json={
+                "messages": [{"role": "user", "content": prompt}],
+                "temperature": self.config.temperature,
+                "max_tokens": self.config.max_tokens,
+            },
+        )
+        response.raise_for_status()
+        return response.json()["choices"][0]["message"]["content"]
+
+    def start_server(self, model_path: str = None, port: int = 8080):
+        """Start the llama-server with specified model."""
+        import subprocess
+        import os
+
+        model = model_path or self.model_path
+        if not model:
+            # Default to Threadfork's Qwen model
+            model = os.path.join(self.THREADFORK_MODELS, "Qwen3-4B-Q4_K_M.gguf")
+
+        if not os.path.exists(model):
+            raise FileNotFoundError(f"Model not found: {model}")
+
+        if not os.path.exists(self.THREADFORK_SERVER):
+            raise FileNotFoundError(f"llama-server not found: {self.THREADFORK_SERVER}")
+
+        self.server_process = subprocess.Popen(
+            [self.THREADFORK_SERVER, "-m", model, "--port", str(port), "-c", "4096"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        # Update config URL
+        self.config.base_url = f"http://localhost:{port}"
+        print(f"Started llama-server on port {port} with model: {os.path.basename(model)}")
+
+        # Wait a moment for server to start
+        import time
+        time.sleep(3)
+
+    def stop_server(self):
+        """Stop the llama-server if we started it."""
+        if self.server_process:
+            self.server_process.terminate()
+            self.server_process = None
 
 
 SYSTEM_PROMPT = """You are playing Pokemon Red. Your goal is to complete the game efficiently.
