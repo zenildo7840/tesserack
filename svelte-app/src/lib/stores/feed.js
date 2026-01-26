@@ -16,8 +16,6 @@ export const FEED_TYPES = {
     ACTION: 'action',           // Agent action (optional, can be noisy)
     SYSTEM: 'system',           // System messages
     HINT: 'hint',               // User hints
-    LAB_TASK: 'lab_task',       // Lab task update
-    LAB_LLM: 'lab_llm',         // Lab LLM request/response
 };
 
 // Add item to feed
@@ -61,20 +59,6 @@ export function feedSystem(message) {
 
 export function feedHint(hint) {
     return addFeedItem(FEED_TYPES.HINT, `Hint: "${hint}"`);
-}
-
-// Lab-specific feed functions
-export function feedLabTask(taskType, target, status) {
-    const statusEmoji = status === 'completed' ? '✓' : status === 'failed' ? '✗' : '→';
-    return addFeedItem(FEED_TYPES.LAB_TASK, `${statusEmoji} ${taskType}: ${target}`, { status });
-}
-
-export function feedLabLLM(objective) {
-    return addFeedItem(FEED_TYPES.LAB_LLM, `LLM planning: ${objective}`);
-}
-
-export function feedLabCheckpoint(checkpointId, name) {
-    return addFeedItem(FEED_TYPES.CHECKPOINT, `Lab checkpoint ${checkpointId}: ${name}`, { checkpointId });
 }
 
 // Clear feed

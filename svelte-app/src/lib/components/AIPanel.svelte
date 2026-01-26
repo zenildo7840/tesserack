@@ -1,13 +1,10 @@
 <script>
     import { activeMode, aiState, stats, objectiveOverride } from '$lib/stores/agent';
     import { trainingProgress } from '$lib/stores/training';
-    import { labModeEnabled, isLabConnected, labData, serverStatus } from '$lib/stores/lab';
     import { setObjectiveOverride, clearObjectiveOverride } from '$lib/core/game-init.js';
-    import { Brain, Sparkles, Target, Zap, ArrowRight, ChevronDown, ChevronUp, Eye, Lightbulb, Edit3, X, MapPin, TrendingUp, Radio, MessageSquare } from 'lucide-svelte';
+    import { Brain, Sparkles, Target, Zap, ArrowRight, ChevronDown, ChevronUp, Eye, Lightbulb, Edit3, X, MapPin, TrendingUp } from 'lucide-svelte';
 
-    // In lab mode, we're "running" if connected to an active experiment
-    $: useLabMode = $labModeEnabled && $isLabConnected;
-    $: isRunning = useLabMode ? $serverStatus.isRunning : $activeMode !== 'idle';
+    $: isRunning = $activeMode !== 'idle';
 
     let showGameState = false;
     let editingObjective = false;
@@ -104,75 +101,6 @@
                 </div>
             {/if}
         </div>
-
-    {:else if useLabMode}
-        <!-- Lab mode: show LLM requests and task updates -->
-        <div class="panel-header">
-            <Radio size={16} class="header-icon lab" />
-            <span class="panel-title">Lab Experiment</span>
-            {#if $serverStatus.isPaused}
-                <span class="status-badge paused">Paused</span>
-            {:else}
-                <span class="status-badge running">
-                    <Zap size={10} />
-                    Running
-                </span>
-            {/if}
-        </div>
-
-        {#if $labData.llmRequest}
-            <div class="objective-row">
-                <Target size={14} class="objective-icon" />
-                <div class="objective-content">
-                    <div class="objective-text">{$labData.llmRequest.objective}</div>
-                </div>
-            </div>
-        {/if}
-
-        {#if $labData.taskUpdate}
-            <div class="plan-box">
-                <div class="plan-label">Current Task</div>
-                <div class="task-info">
-                    <span class="task-type">{$labData.taskUpdate.type}</span>
-                    <span class="task-target">{$labData.taskUpdate.target}</span>
-                </div>
-                <div class="task-progress">
-                    <div class="task-progress-bar">
-                        <div
-                            class="task-progress-fill"
-                            class:completed={$labData.taskUpdate.status === 'completed'}
-                            class:failed={$labData.taskUpdate.status === 'failed'}
-                            style="width: {Math.min(100, ($labData.taskUpdate.steps / $labData.taskUpdate.budget) * 100)}%"
-                        ></div>
-                    </div>
-                    <div class="task-progress-text">
-                        {$labData.taskUpdate.steps} / {$labData.taskUpdate.budget} steps
-                        {#if $labData.taskUpdate.status === 'completed'}
-                            <span class="task-status completed">Completed</span>
-                        {:else if $labData.taskUpdate.status === 'failed'}
-                            <span class="task-status failed">Failed</span>
-                        {/if}
-                    </div>
-                </div>
-            </div>
-        {/if}
-
-        {#if $labData.llmResponse}
-            <div class="llm-response-box">
-                <div class="response-header">
-                    <MessageSquare size={12} />
-                    <span>LLM Response</span>
-                </div>
-                <div class="response-text">{$labData.llmResponse.response}</div>
-            </div>
-        {/if}
-
-        {#if $labData.checkpoint}
-            <div class="checkpoint-alert">
-                <Sparkles size={14} />
-                <span>Checkpoint: {$labData.checkpoint.name}</span>
-            </div>
-        {/if}
 
     {:else if isRunning}
         <!-- AI is running -->
@@ -870,141 +798,5 @@
 
     .game-progress {
         color: var(--text-muted);
-    }
-
-    /* Lab mode styles */
-    .panel-header :global(.header-icon.lab) {
-        color: var(--accent-secondary);
-        animation: pulse-icon 2s ease-in-out infinite;
-    }
-
-    .status-badge.running {
-        background: rgba(116, 185, 255, 0.2);
-        color: var(--accent-primary);
-    }
-
-    .status-badge.paused {
-        background: rgba(253, 203, 110, 0.2);
-        color: #fdcb6e;
-    }
-
-    .task-info {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        margin-bottom: 10px;
-    }
-
-    .task-type {
-        padding: 2px 8px;
-        background: var(--accent-primary);
-        color: white;
-        border-radius: 4px;
-        font-size: 11px;
-        font-weight: 600;
-        text-transform: uppercase;
-    }
-
-    .task-target {
-        font-size: 13px;
-        color: var(--text-primary);
-        font-weight: 500;
-    }
-
-    .task-progress {
-        margin-top: 8px;
-    }
-
-    .task-progress-bar {
-        height: 6px;
-        background: var(--bg-dark);
-        border-radius: 3px;
-        overflow: hidden;
-    }
-
-    .task-progress-fill {
-        height: 100%;
-        background: var(--accent-primary);
-        transition: width 0.3s ease;
-    }
-
-    .task-progress-fill.completed {
-        background: var(--accent-success);
-    }
-
-    .task-progress-fill.failed {
-        background: var(--accent-secondary);
-    }
-
-    .task-progress-text {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        margin-top: 6px;
-        font-size: 11px;
-        color: var(--text-muted);
-    }
-
-    .task-status {
-        font-weight: 600;
-    }
-
-    .task-status.completed {
-        color: var(--accent-success);
-    }
-
-    .task-status.failed {
-        color: var(--accent-secondary);
-    }
-
-    .llm-response-box {
-        background: var(--bg-input);
-        border-radius: var(--border-radius-sm);
-        padding: 10px;
-        margin-top: 12px;
-    }
-
-    .response-header {
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        font-size: 10px;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-        color: var(--text-muted);
-        margin-bottom: 8px;
-    }
-
-    .response-text {
-        font-size: 12px;
-        color: var(--text-secondary);
-        line-height: 1.5;
-        max-height: 100px;
-        overflow-y: auto;
-        white-space: pre-wrap;
-    }
-
-    .checkpoint-alert {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        margin-top: 12px;
-        padding: 10px 12px;
-        background: linear-gradient(135deg, rgba(0, 206, 201, 0.2), rgba(116, 185, 255, 0.2));
-        border-radius: var(--border-radius-sm);
-        border-left: 3px solid var(--accent-success);
-        color: var(--accent-success);
-        font-size: 13px;
-        font-weight: 500;
-    }
-
-    .checkpoint-alert :global(svg) {
-        animation: spin 2s linear infinite;
-    }
-
-    @keyframes spin {
-        from { transform: rotate(0deg); }
-        to { transform: rotate(360deg); }
     }
 </style>

@@ -5,9 +5,7 @@
     // Components
     import Header from '$lib/components/Header.svelte';
     import GameCanvas from '$lib/components/GameCanvas.svelte';
-    import LabCanvas from '$lib/components/LabCanvas.svelte';
     import ModeSelector from '$lib/components/ModeSelector.svelte';
-    import LabControls from '$lib/components/LabControls.svelte';
     import GameStateBar from '$lib/components/GameStateBar.svelte';
     import AIPanel from '$lib/components/AIPanel.svelte';
     import ProgressBar from '$lib/components/ProgressBar.svelte';
@@ -24,7 +22,6 @@
     import { activeMode } from '$lib/stores/agent';
     import { modelState } from '$lib/stores/training';
     import { feedSystem } from '$lib/stores/feed';
-    import { labModeEnabled, isLabConnected } from '$lib/stores/lab';
 
     onMount(() => {
         feedSystem('Welcome to Tesserack! Drop a Pokemon Red ROM to begin.');
@@ -38,10 +35,7 @@
 
     <main class="main-content">
         <div class="left-column">
-            {#if $labModeEnabled}
-                <!-- Lab mode: show lab canvas (handles connected/disconnected state internally) -->
-                <LabCanvas />
-            {:else if !$romLoaded}
+            {#if !$romLoaded}
                 <RomDropzone />
             {:else}
                 <GameCanvas />
@@ -49,21 +43,14 @@
 
             <ProgressBar />
 
-            {#if $romLoaded && !$labModeEnabled}
+            {#if $romLoaded}
                 <GameControls />
                 <HintInput />
             {/if}
         </div>
 
         <div class="right-column">
-            <LabControls />
-
-            {#if $labModeEnabled}
-                <!-- Lab mode: show lab-specific UI -->
-                <GameStateBar />
-                <AIPanel />
-            {:else if $romLoaded}
-                <!-- Browser mode: show normal UI -->
+            {#if $romLoaded}
                 <ModeSelector />
                 <ModelStatus />
                 <GameStateBar />

@@ -1,30 +1,12 @@
 <script>
     import { gameState } from '$lib/stores/game';
-    import { labModeEnabled, isLabConnected, labData } from '$lib/stores/lab';
     import { MapPin, Users, Award } from 'lucide-svelte';
 
-    // Use lab state when in lab mode, otherwise use browser game state
-    $: useLabData = $labModeEnabled && $isLabConnected && $labData.state;
-    $: state = useLabData ? $labData.state : $gameState;
-
-    // Format party data (different structure from lab vs browser)
-    $: partyDisplay = useLabData
-        ? (state.party || []).map(p => `#${p.species_id} Lv${p.level}`).join(', ')
-        : (state.party || []).map(p => `${p.species} Lv${p.level}`).join(', ');
-
-    // Badge count (different format from lab vs browser)
-    $: badgeCount = useLabData
-        ? (state.badge_count || 0)
-        : (state.badges?.length || 0);
-
-    // Location display
-    $: location = useLabData
-        ? state.location || `Map ${state.map_id}`
-        : (state.location || 'Unknown');
-
-    $: coords = useLabData
-        ? { x: state.player_x || 0, y: state.player_y || 0 }
-        : (state.coordinates || { x: 0, y: 0 });
+    $: state = $gameState;
+    $: partyDisplay = (state.party || []).map(p => `${p.species} Lv${p.level}`).join(', ');
+    $: badgeCount = state.badges?.length || 0;
+    $: location = state.location || 'Unknown';
+    $: coords = state.coordinates || { x: 0, y: 0 };
 </script>
 
 <div class="game-state-bar panel">
