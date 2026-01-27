@@ -47,6 +47,11 @@ export const pureRLMetrics = writable({
     totalReward: 0,
     breakdown: { tier1: 0, tier2: 0, tier3: 0, penalties: 0 },
     firedTests: [],
+    // Test bundle metrics
+    currentLocation: null,
+    bundleInfo: null,
+    totalRewards: { tier1: 0, tier2: 0, tier3: 0, penalties: 0, total: 0 },
+    completedObjectives: [],
     // Training metrics (REINFORCE)
     trainSteps: 0,
     bufferFill: 0,
@@ -123,6 +128,11 @@ function handlePureRLStep(stepData) {
             totalReward: stepData.totalReward,
             breakdown: stepData.breakdown,
             firedTests: stepData.firedTests,
+            // Test bundle metrics
+            currentLocation: stepData.currentLocation ?? prev.currentLocation,
+            bundleInfo: stepData.bundleInfo ?? prev.bundleInfo,
+            totalRewards: stepData.totalRewards ?? prev.totalRewards,
+            completedObjectives: stepData.completedObjectives ?? prev.completedObjectives,
             // Training metrics
             trainSteps: stepData.trainSteps ?? 0,
             bufferFill: stepData.bufferFill ?? 0,
@@ -247,6 +257,13 @@ export async function initializeLab(romBuffer, canvas) {
             gamma: 0.99,
             normalizeReturns: true,
         });
+
+        // 6b. Load test bundles for reward evaluation
+        try {
+            await labPureRLAgent.rewards.loadBundles('/data/test-bundles.json');
+        } catch (err) {
+            console.warn('[Lab] Failed to load test bundles, using defaults:', err.message);
+        }
 
         // 7. Start emulator
         labEmulator.frameCallback = updateLabGameState;
@@ -470,6 +487,12 @@ export function resetLab() {
         totalReward: 0,
         breakdown: { tier1: 0, tier2: 0, tier3: 0, penalties: 0 },
         firedTests: [],
+        // Test bundle metrics
+        currentLocation: null,
+        bundleInfo: null,
+        totalRewards: { tier1: 0, tier2: 0, tier3: 0, penalties: 0, total: 0 },
+        completedObjectives: [],
+        // Training metrics
         trainSteps: 0,
         bufferFill: 0,
         bufferSize: 128,

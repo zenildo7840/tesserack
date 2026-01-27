@@ -22,3 +22,7 @@ node_modules
 data/prima-guide-raw.txt
 data/prima-guide-text.txt
 data/walkthrough-raw.json
+
+# Prima Guide extraction (large files)
+data/prima-guide.pdf
+data/prima-pages/

@@ -258,6 +258,9 @@ export class PureRLAgent {
         this.totalReward += result.reward;
         this.lastStepResult = result;
 
+        // Get test bundle stats
+        const rewardStats = this.rewards.getStats();
+
         // Callback with full metrics
         if (this.onStep) {
             this.onStep({
@@ -268,6 +271,12 @@ export class PureRLAgent {
                 firedTests: result.firedTests,
                 done: result.done,
                 totalReward: this.totalReward,
+                // Test bundle metrics
+                currentLocation: result.currentLocation || rewardStats.currentLocation,
+                bundleInfo: result.bundleInfo || rewardStats.bundleInfo,
+                totalRewards: rewardStats.totalRewards,
+                completedObjectives: rewardStats.completedObjectives,
+                // Training metrics
                 trainSteps: this.core.trainSteps,
                 bufferFill: this.core.buffer.length,
                 bufferSize: this.config.rolloutSize,

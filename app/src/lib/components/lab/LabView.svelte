@@ -7,6 +7,7 @@
     import HyperparamsPopover from './HyperparamsPopover.svelte';
     import MetricsChart from './MetricsChart.svelte';
     import RewardBar from './RewardBar.svelte';
+    import TestsPanel from './TestsPanel.svelte';
     import WalkthroughGraph from './WalkthroughGraph.svelte';
     import {
         walkthroughGraph,
@@ -504,6 +505,17 @@
                     <div class="section-header">Reward Breakdown</div>
                     <RewardBar breakdown={$pureRLMetrics.breakdown} />
                 </div>
+
+                <div class="metrics-divider"></div>
+
+                <!-- Tests Panel -->
+                <TestsPanel
+                    currentLocation={$pureRLMetrics.currentLocation}
+                    bundleInfo={$pureRLMetrics.bundleInfo}
+                    firedTests={$pureRLMetrics.firedTests || []}
+                    totalRewards={$pureRLMetrics.totalRewards || { tier1: 0, tier2: 0, tier3: 0, penalties: 0, total: 0 }}
+                    completedObjectives={$pureRLMetrics.completedObjectives || []}
+                />
 
             {:else}
                 <!-- Play Mode: How it Works (Collapsible) -->
