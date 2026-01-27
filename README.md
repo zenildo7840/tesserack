@@ -9,7 +9,12 @@ Experimental reinforcement learning infrastructure for studying hierarchical tas
 
 ## Overview
 
-Tesserack is a research test bed exploring hierarchical approaches to game-playing: a language model handles task decomposition while a policy network learns execution. The environment is Pokemon Red, chosen for its deterministic mechanics and well-documented memory layout.
+Tesserack is a research test bed for studying reinforcement learning in game environments. It supports two execution modes:
+
+- **Hierarchical mode**: Language model handles task decomposition, policy network executes
+- **Pure RL mode**: Policy network acts directly, rewards from deterministic unit tests
+
+The environment is Pokemon Red, chosen for its deterministic mechanics and well-documented memory layout.
 
 **Two interfaces:**
 
@@ -34,9 +39,11 @@ npm run dev
 **Requirements:** Chrome/Edge 113+ (WebGPU), Pokemon Red ROM
 
 **Features:**
-- Language model via WebLLM or external APIs (OpenAI, Groq, local)
+- **LLM Mode**: Language model via WebLLM or external APIs (OpenAI, Groq, local)
+- **Pure RL Mode**: No LLM calls - simple policy network with epsilon-greedy exploration and deterministic unit-test rewards (toggle via "Pure RL" button in Lab)
 - Policy network training visualization
 - Game state inspection
+- Real-time reward breakdown (tier1/tier2/tier3/penalties)
 
 ## Lab (Experimental)
 
@@ -45,25 +52,30 @@ For running experiments, comparing configurations, and exploring training dynami
 ```bash
 cd lab
 pip install -r requirements.txt
+
+# Hierarchical mode (LLM + Policy)
 python scripts/run_experiment.py --rom pokemon_red.gb
+
+# Pure RL mode (no LLM, unit test rewards)
+python scripts/run_experiment.py configs/pure_rl_unit_tests.json
 ```
 
-**Requirements:** Python 3.10+, Pokemon Red ROM, Ollama (or other LLM backend)
+**Requirements:** Python 3.10+, Pokemon Red ROM. Ollama only needed for hierarchical mode.
 
 **Features:**
+- Two execution modes: hierarchical (LLM+Policy) and pure RL
+- Deterministic unit-test-style rewards with tiered breakdown
 - Headless execution at 10x+ speed
-- Swappable model backends
 - Experiment logging and metrics
-- Configurable reward specifications
 
 See [lab/README.md](lab/README.md) for details.
 
 ## Architecture
 
+### Hierarchical Mode (LLM + Policy)
+
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                     HIERARCHICAL LOOP                        │
-│                                                              │
 │   ┌─────────────┐         ┌─────────────┐                   │
 │   │     LLM     │  tasks  │   Policy    │  actions          │
 │   │  (Planner)  │────────▶│  (Executor) │─────────▶ Game    │
@@ -78,11 +90,26 @@ See [lab/README.md](lab/README.md) for details.
 └─────────────────────────────────────────────────────────────┘
 ```
 
-**LLM Layer:** Issues task-level goals ("Navigate to Pewter City", "Train to level 14")
+### Pure RL Mode (Unit Test Rewards)
 
-**Policy Layer:** Executes micro-actions to achieve tasks, learns from experience
+```
+┌─────────────────────────────────────────────────────────────┐
+│   ┌─────────────┐         ┌─────────────┐                   │
+│   │   Policy    │ action  │  Emulator   │  new state        │
+│   │   πθ(a|s)   │────────▶│   (PyBoy)   │─────────┐         │
+│   └─────────────┘         └─────────────┘         │         │
+│         ▲                                         │         │
+│         │ learns                                  ▼         │
+│   ┌─────────────┐         ┌─────────────────────────────┐   │
+│   │ Experience  │◀────────│  Unit Test Rewarder         │   │
+│   │   Buffer    │  reward │  tests(prev,curr) → r       │   │
+│   └─────────────┘         └─────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────┘
+```
 
-**The Harness:** Manages game state, detects task completion, logs everything
+**Hierarchical mode**: LLM issues task-level goals, policy executes, learns from shaping rewards
+
+**Pure RL mode**: Policy acts directly every step, deterministic unit tests compute rewards
 
 ## Current Focus
 

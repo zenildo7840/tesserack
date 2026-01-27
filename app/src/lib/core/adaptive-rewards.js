@@ -637,7 +637,15 @@ export class CombinedRewardSystem {
         this.visualCheckpoints = new VisualCheckpoints(canvas);
         this.autoDiscovery = new AutoCheckpointDiscovery(canvas, memoryReader);
         this.totalReward = 0;
+        this.lastReward = 0;  // Track last computed reward
         this.rewardLog = [];
+    }
+
+    /**
+     * Get the last computed reward
+     */
+    getLastReward() {
+        return this.lastReward;
     }
 
     /**
@@ -685,6 +693,9 @@ export class CombinedRewardSystem {
         if (options.recordFrames && Math.random() < 0.1) {
             this.visualCheckpoints.recordFrame(state);
         }
+
+        // Track last reward
+        this.lastReward = totalReward;
 
         // Log significant rewards
         if (totalReward > 0) {
@@ -739,6 +750,7 @@ export class CombinedRewardSystem {
         this.visualCheckpoints.clear();
         this.autoDiscovery.clear();
         this.totalReward = 0;
+        this.lastReward = 0;
         this.rewardLog = [];
     }
 }

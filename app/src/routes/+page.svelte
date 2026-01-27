@@ -1,5 +1,6 @@
 <script>
     import { onMount } from 'svelte';
+    import { browser } from '$app/environment';
     import { Info, Github, ExternalLink, Gamepad2, FlaskConical } from 'lucide-svelte';
 
     // Components
@@ -13,8 +14,6 @@
     import HintInput from '$lib/components/HintInput.svelte';
     import ActivityFeed from '$lib/components/ActivityFeed.svelte';
     import AdvancedPanel from '$lib/components/AdvancedPanel.svelte';
-    import LLMConfig from '$lib/components/LLMConfig.svelte';
-    import RomDropzone from '$lib/components/RomDropzone.svelte';
     import ModelStatus from '$lib/components/ModelStatus.svelte';
     import LabView from '$lib/components/lab/LabView.svelte';
 
@@ -24,12 +23,25 @@
     import { modelState } from '$lib/stores/training';
     import { feedSystem } from '$lib/stores/feed';
 
-    // View mode: 'play' or 'lab'
+    // View mode: 'play' or 'lab' - restore from localStorage
     let viewMode = 'play';
+    let mounted = false;
 
     onMount(() => {
+        // Restore last view mode
+        const savedMode = localStorage.getItem('tesserack_viewMode');
+        if (savedMode === 'play' || savedMode === 'lab') {
+            viewMode = savedMode;
+        }
+        mounted = true;
+
         feedSystem('Welcome to Tesserack! Drop a Pokemon Red ROM to begin.');
     });
+
+    // Save view mode when it changes (only after initial mount)
+    $: if (mounted && viewMode) {
+        localStorage.setItem('tesserack_viewMode', viewMode);
+    }
 </script>
 
 <div class="app">
@@ -58,16 +70,28 @@
     {#if viewMode === 'lab'}
         <!-- Lab Mode -->
         <main class="lab-content">
-            <LabView />
+            {#if !$romLoaded}
+                <div class="lab-prompt">
+                    <p>Load a ROM using the dropdown above to start Lab mode</p>
+                </div>
+            {/if}
+            <div class="lab-layout">
+                <div class="lab-main">
+                    <LabView />
+                </div>
+                <div class="lab-sidebar">
+                    <ActivityFeed />
+                </div>
+            </div>
         </main>
     {:else}
         <!-- Play Mode -->
-        <LLMConfig />
-
         <main class="main-content">
             <div class="left-column">
                 {#if !$romLoaded}
-                    <RomDropzone />
+                    <div class="play-prompt">
+                        <p>Load a ROM using the dropdown above to start playing</p>
+                    </div>
                 {:else}
                     <GameCanvas />
                 {/if}
@@ -87,12 +111,17 @@
                     <GameStateBar />
                     <AIPanel />
                 {/if}
-
-                <ActivityFeed />
             </div>
         </main>
 
         <AdvancedPanel />
+    {/if}
+
+    <!-- Activity Feed for Play mode (Lab mode has it in sidebar) -->
+    {#if viewMode !== 'lab'}
+        <div class="global-feed">
+            <ActivityFeed />
+        </div>
     {/if}
 
     <footer class="info-footer">
@@ -133,7 +162,7 @@
         display: flex;
         gap: 4px;
         padding: 4px;
-        background: var(--bg-card);
+        background: var(--bg-input);
         border-radius: 8px;
         width: fit-content;
         margin: 16px auto 0;
@@ -166,6 +195,69 @@
     .lab-content {
         margin-top: 16px;
         min-height: 600px;
+    }
+
+    .lab-layout {
+        display: grid;
+        grid-template-columns: 1fr 320px;
+        gap: 16px;
+    }
+
+    .lab-main {
+        min-width: 0; /* Prevent grid blowout */
+    }
+
+    .lab-sidebar {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .lab-sidebar :global(.activity-feed) {
+        position: sticky;
+        top: 16px;
+        max-height: calc(100vh - 150px);
+    }
+
+    .lab-sidebar :global(.feed-list) {
+        max-height: calc(100vh - 250px);
+    }
+
+    @media (max-width: 1000px) {
+        .lab-layout {
+            grid-template-columns: 1fr;
+        }
+
+        .lab-sidebar {
+            order: -1; /* Put feed above on mobile */
+        }
+
+        .lab-sidebar :global(.activity-feed) {
+            position: static;
+            max-height: 200px;
+        }
+
+        .lab-sidebar :global(.feed-list) {
+            max-height: 160px;
+        }
+    }
+
+    .lab-prompt,
+    .play-prompt {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 40px 20px;
+        background: var(--bg-panel);
+        border: 2px dashed var(--border-color);
+        border-radius: var(--border-radius);
+        text-align: center;
+        color: var(--text-muted);
+        font-size: 14px;
+    }
+
+    .play-prompt {
+        aspect-ratio: 160 / 144;
     }
 
     .main-content {
@@ -246,5 +338,19 @@
 
     .credits-links a:hover {
         color: var(--accent-primary);
+    }
+
+    /* Global Activity Feed */
+    .global-feed {
+        margin-top: 16px;
+    }
+
+    .global-feed :global(.activity-feed) {
+        min-height: 120px;
+        max-height: 200px;
+    }
+
+    .global-feed :global(.feed-list) {
+        max-height: 160px;
     }
 </style>

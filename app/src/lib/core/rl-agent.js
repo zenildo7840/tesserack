@@ -9,24 +9,33 @@ import { curriculumTracker } from './curriculum.js';
 /**
  * System prompt that asks LLM to generate multiple candidate plans
  */
-const SYSTEM_PROMPT = `You are an expert AI playing Pokemon Red. Your ultimate goal is to become the Pokemon Champion.
+const SYSTEM_PROMPT = `You are playing Pokemon Red. Generate action sequences to make PROGRESS.
 
-CONTROLS:
-- Valid buttons: up, down, left, right, a, b
-- Press 'a' to talk, confirm, advance dialog
-- Press 'b' to cancel or go back
-- NEVER use 'start' or 'select'
+CONTROLS: up, down, left, right, a, b
+- Movement: up/down/left/right to walk
+- 'a': confirm, talk, interact, advance text
+- 'b': cancel, exit menus
 
-Generate 3 DIFFERENT action plans for the current situation. Each plan should have a different strategy.
+CRITICAL RULES:
+1. If showing dialog/text: press 'a' 2-3 times to advance, then MOVE
+2. If in a building: navigate to exit (usually down then through door)
+3. If outdoors: move toward your next objective location
+4. VARIETY IS KEY: each plan must have DIFFERENT movement directions
+5. Always include movement (up/down/left/right), don't just spam 'a'
 
-OUTPUT FORMAT (follow exactly):
-PLAN1: <strategy description>
+COMMON SEQUENCES:
+- Exit house: down, down, down, down, a (walk to door, exit)
+- Talk to someone: a, a, a (then move away)
+- Navigate route: Mix of directions toward destination
+
+OUTPUT FORMAT:
+PLAN1: <what you're trying to do>
 ACTIONS1: btn1, btn2, btn3, btn4, btn5, btn6, btn7, btn8, btn9, btn10
 
-PLAN2: <different strategy>
+PLAN2: <different approach>
 ACTIONS2: btn1, btn2, btn3, btn4, btn5, btn6, btn7, btn8, btn9, btn10
 
-PLAN3: <another strategy>
+PLAN3: <another option>
 ACTIONS3: btn1, btn2, btn3, btn4, btn5, btn6, btn7, btn8, btn9, btn10`;
 
 /**
@@ -151,43 +160,56 @@ export class RLAgent {
 
         const lines = [];
 
-        // Prima Guide objective
-        if (nextCheckpoint) {
-            lines.push(`OBJECTIVE: ${nextCheckpoint.name}`);
-            lines.push(`  "${nextCheckpoint.description}"`);
-            lines.push(`  (From Prima Strategy Guide - ${nextCheckpoint.guideRef || 'official walkthrough'})`);
-        } else {
-            lines.push('OBJECTIVE: Become Pokemon Champion!');
-        }
-
-        lines.push('');
-        lines.push(`PROGRESS: ${stats.completionPercent}% complete (${stats.badges})`);
-        lines.push('');
-        lines.push('GAME STATE:');
+        // Current situation and what to do
+        lines.push('=== CURRENT SITUATION ===');
         lines.push(`Location: ${state.location}`);
         lines.push(`Position: (${state.coordinates.x}, ${state.coordinates.y})`);
-        lines.push(`Badges: ${state.badges.length}/8`);
 
-        if (state.party.length > 0) {
-            lines.push('');
-            lines.push('PARTY:');
-            for (const p of state.party) {
-                lines.push(`  ${p.species} Lv.${p.level} HP:${p.currentHP}/${p.maxHP}`);
-            }
-        }
-
-        if (state.inBattle) {
-            lines.push('');
-            lines.push('[IN BATTLE]');
+        // Add immediate action hints based on location
+        const locUpper = state.location.toUpperCase();
+        if (locUpper.includes('HOUSE') && locUpper.includes('2F')) {
+            lines.push('ACTION NEEDED: Go downstairs - walk DOWN to the stairs');
+        } else if (locUpper.includes('HOUSE') && locUpper.includes('1F')) {
+            lines.push('ACTION NEEDED: Exit the house - walk DOWN to the door, press A');
+        } else if (locUpper.includes('LAB') || locUpper.includes('OAKS')) {
+            lines.push('ACTION NEEDED: Talk to Prof Oak or pick a starter Pokemon');
+        } else if (locUpper.includes('ROUTE')) {
+            lines.push('ACTION NEEDED: Navigate toward your destination, avoid/battle wild Pokemon');
+        } else if (locUpper.includes('CITY') || locUpper.includes('TOWN')) {
+            lines.push('ACTION NEEDED: Explore, find Pokemon Center/Mart, or continue to next route');
         }
 
         if (state.dialog?.trim()) {
             lines.push('');
-            lines.push(`DIALOG: "${state.dialog}"`);
+            lines.push(`[DIALOG SHOWING]: "${state.dialog}"`);
+            lines.push('Press A to advance dialog, then MOVE to make progress');
+        }
+
+        if (state.inBattle) {
+            lines.push('');
+            lines.push('[IN BATTLE] - Select moves with A, navigate with directions');
         }
 
         lines.push('');
-        lines.push('Generate 3 different action plans:');
+        lines.push('=== OBJECTIVE ===');
+        if (nextCheckpoint) {
+            lines.push(`${nextCheckpoint.name}: ${nextCheckpoint.description}`);
+        } else {
+            lines.push('Become Pokemon Champion!');
+        }
+
+        lines.push('');
+        lines.push(`Progress: ${stats.completionPercent}% | Badges: ${state.badges.length}/8`);
+
+        if (state.party.length > 0) {
+            const partyStr = state.party.map(p => `${p.species} Lv${p.level}`).join(', ');
+            lines.push(`Party: ${partyStr}`);
+        } else {
+            lines.push('Party: Empty - need to get first Pokemon!');
+        }
+
+        lines.push('');
+        lines.push('Generate 3 action plans with DIFFERENT movement directions:');
 
         return lines.join('\n');
     }
@@ -419,6 +441,17 @@ export class RLAgent {
         } catch (err) {
             console.error('LLM error:', err);
             this.actionQueue = ['a', 'a', 'up', 'a', 'a'];
+
+            // Report error through callback
+            if (this.onUpdate) {
+                this.onUpdate({
+                    action: this.actionQueue,
+                    reasoning: `LLM Error: ${err.message || 'Unknown error'} - using fallback`,
+                    error: err.message || String(err),
+                    state: currState,
+                    rlStats: this.getStats(),
+                });
+            }
         }
     }
 

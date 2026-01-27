@@ -6,7 +6,7 @@ import random
 import numpy as np
 
 from .state import GameState
-from .tasks import Task
+from .tasks import Task, TaskType
 
 
 # Actions available in Pokemon Red
@@ -87,9 +87,12 @@ class PolicyNetwork:
 
         return encoding
 
-    def encode_task(self, task: Task) -> np.ndarray:
+    def encode_task(self, task: Optional[Task]) -> np.ndarray:
         """Encode task into fixed-size vector."""
         encoding = np.zeros(self.task_dim)
+
+        if task is None:
+            return encoding
 
         # Task type one-hot
         task_types = ["navigate", "catch", "train", "battle", "buy", "use_item"]
@@ -105,7 +108,7 @@ class PolicyNetwork:
     def select_action(
         self,
         state: GameState,
-        task: Task,
+        task: Optional[Task],
         epsilon: float = 0.1,
     ) -> str:
         """Select action using epsilon-greedy policy."""
@@ -132,7 +135,7 @@ class PolicyNetwork:
         action_idx = np.random.choice(len(ACTIONS), p=probs)
         return IDX_TO_ACTION[action_idx]
 
-    def get_action_probs(self, state: GameState, task: Task) -> np.ndarray:
+    def get_action_probs(self, state: GameState, task: Optional[Task]) -> np.ndarray:
         """Get action probabilities for given state and task."""
         state_enc = self.encode_state(state)
         task_enc = self.encode_task(task)

@@ -17,7 +17,85 @@ import {
     recordStep,
     recordLLMCall
 } from '../../stores/lab.js';
+import { feedSystem } from '../../stores/feed.js';
 import { get } from 'svelte/store';
+
+// Map interior game locations to their parent walkthrough location
+const locationToParent = {
+    'PLAYERS HOUSE 1F': 'Pallet Town',
+    'PLAYERS HOUSE 2F': 'Pallet Town',
+    'RIVALS HOUSE': 'Pallet Town',
+    'OAKS LAB': 'Pallet Town',
+    "PROF. OAK'S LAB": 'Pallet Town',
+    'PALLET TOWN': 'Pallet Town',
+    'ROUTE 1': 'Route 1',
+    'VIRIDIAN CITY': 'Viridian City',
+    'VIRIDIAN POKEMON CENTER': 'Viridian City',
+    'VIRIDIAN POKEMART': 'Viridian City',
+    'VIRIDIAN GYM': 'Viridian City',
+    'VIRIDIAN FOREST': 'Viridian Forest',
+    'ROUTE 2': 'Route 2',
+    'PEWTER CITY': 'Pewter City',
+    'PEWTER GYM': 'Pewter City',
+    'ROUTE 3': 'Route 3',
+    'MT MOON 1F': 'Mt. Moon',
+    'MT MOON B1F': 'Mt. Moon',
+    'MT MOON B2F': 'Mt. Moon',
+    'ROUTE 4': 'Route 4',
+    'CERULEAN CITY': 'Cerulean City',
+    'CERULEAN GYM': 'Cerulean City',
+    'ROUTE 24': 'Route 24',
+    'ROUTE 25': 'Route 25',
+    'ROUTE 5': 'Route 5',
+    'ROUTE 6': 'Route 6',
+    'VERMILION CITY': 'Vermilion City',
+    'VERMILION GYM': 'Vermilion City',
+    'SS ANNE': 'Vermilion City',
+    'CELADON CITY': 'Celadon City',
+    'CELADON GYM': 'Celadon City',
+    'GAME CORNER': 'Celadon City',
+    'ROCKET HIDEOUT': 'Celadon City',
+    'LAVENDER TOWN': 'Lavender Town',
+    'POKEMON TOWER': 'Pokemon Tower',
+    'SAFFRON CITY': 'Saffron City',
+    'SAFFRON GYM': 'Saffron City',
+    'SILPH CO': 'Saffron City',
+    'FUCHSIA CITY': 'Fuchsia City',
+    'FUCHSIA GYM': 'Fuchsia City',
+    'SAFARI ZONE': 'Safari Zone',
+    'CINNABAR ISLAND': 'Cinnabar Island',
+    'CINNABAR GYM': 'Cinnabar Island',
+    'POKEMON MANSION': 'Cinnabar Island',
+    'VICTORY ROAD': 'Victory Road',
+    'INDIGO PLATEAU': 'Indigo Plateau',
+    'POKEMON LEAGUE': 'Indigo Plateau',
+};
+
+function mapLocationToParent(locationName) {
+    if (!locationName) return null;
+    const upper = locationName.toUpperCase();
+
+    // Direct match
+    if (locationToParent[upper]) {
+        return locationToParent[upper];
+    }
+
+    // Partial match
+    for (const [key, parent] of Object.entries(locationToParent)) {
+        if (upper.includes(key) || key.includes(upper)) {
+            return parent;
+        }
+    }
+
+    // Extract city/town name
+    const cityMatch = locationName.match(/(PALLET|VIRIDIAN|PEWTER|CERULEAN|VERMILION|CELADON|SAFFRON|LAVENDER|FUCHSIA|CINNABAR)/i);
+    if (cityMatch) {
+        const cityName = cityMatch[1].charAt(0).toUpperCase() + cityMatch[1].slice(1).toLowerCase();
+        return `${cityName} ${locationName.toLowerCase().includes('town') ? 'Town' : 'City'}`;
+    }
+
+    return locationName;
+}
 
 /**
  * Build guide context string for current game state
@@ -25,11 +103,23 @@ import { get } from 'svelte/store';
 function buildGuideContext(locationName, graph) {
     if (!graph || !graph.nodes.length) return '';
 
-    // Find location node
-    const location = graph.nodes.find(n =>
+    // Map game location to walkthrough location
+    const mappedLocation = mapLocationToParent(locationName);
+
+    // Find location node - try exact match first
+    let location = graph.nodes.find(n =>
         n.type === 'location' &&
-        n.name.toLowerCase().includes(locationName.toLowerCase())
+        n.name.toLowerCase() === mappedLocation?.toLowerCase()
     );
+
+    // Fallback to partial match
+    if (!location && mappedLocation) {
+        location = graph.nodes.find(n =>
+            n.type === 'location' &&
+            (n.name.toLowerCase().includes(mappedLocation.toLowerCase()) ||
+             mappedLocation.toLowerCase().includes(n.name.toLowerCase()))
+        );
+    }
 
     if (!location) return '';
 
@@ -189,9 +279,11 @@ function calculateGuideAdherenceReward(prevState, currentState, graph) {
 
     // Reward for moving toward guide-recommended locations
     if (currentState.location !== prevState.location) {
+        const mappedLoc = mapLocationToParent(currentState.location);
         const currentLoc = graph.nodes.find(n =>
             n.type === 'location' &&
-            n.name.toLowerCase().includes(currentState.location.toLowerCase())
+            (n.name.toLowerCase() === mappedLoc?.toLowerCase() ||
+             n.name.toLowerCase().includes(mappedLoc?.toLowerCase() || ''))
         );
 
         if (currentLoc) {
@@ -268,8 +360,28 @@ export class GuideAgent extends RLAgent {
     async step() {
         const prevState = this.lastState || this.reader.getGameState();
 
-        // Call parent step
-        await super.step();
+        // Call parent step with error reporting
+        try {
+            await super.step();
+        } catch (err) {
+            // Report LLM errors to the activity feed
+            const errorMsg = err.message || String(err);
+            if (errorMsg.includes('WebLLM not initialized')) {
+                feedSystem('LLM Error: Browser model not loaded. Select a model in the header.');
+            } else if (errorMsg.includes('No model configured')) {
+                feedSystem('LLM Error: No model selected. Configure in the Model dropdown.');
+            } else if (errorMsg.includes('No endpoint configured')) {
+                feedSystem('LLM Error: No API endpoint configured.');
+            } else if (errorMsg.includes('401') || errorMsg.includes('Unauthorized')) {
+                feedSystem('LLM Error: Invalid API key. Check your key in Model settings.');
+            } else if (errorMsg.includes('429') || errorMsg.includes('rate limit')) {
+                feedSystem('LLM Error: Rate limited. Wait a moment and try again.');
+            } else {
+                feedSystem(`LLM Error: ${errorMsg.slice(0, 100)}`);
+            }
+            console.error('[GuideAgent] Step error:', err);
+            return; // Skip the rest of the step on error
+        }
 
         const currentState = this.reader.getGameState();
         this.lastState = currentState;

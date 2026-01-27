@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Literal
 import json
 
 
@@ -12,6 +12,9 @@ class EmulatorConfig:
     headless: bool = True
     speed: int = 0  # 0 = uncapped
     save_state_path: Optional[str] = None  # Start from save state
+    frame_skip: int = 4  # Frames per action (pure RL loop)
+    action_hold_frames: int = 8
+    action_release_frames: int = 4
 
 
 @dataclass
@@ -23,6 +26,7 @@ class LLMConfig:
     model_path: str = ""  # For llama.cpp: path to .gguf file
     temperature: float = 0.7
     max_tokens: int = 256
+    enabled: bool = True  # Ignored in pure_rl mode
 
 
 @dataclass
@@ -37,6 +41,7 @@ class PolicyConfig:
     train_every: int = 100  # Train every N steps
     batch_size: int = 32
     load_weights: Optional[str] = None  # Path to pre-trained weights
+    ignore_task: bool = False  # Pure-RL mode: ignore task conditioning
 
 
 @dataclass
@@ -44,12 +49,35 @@ class TaskConfig:
     default_budget: int = 1000  # Max steps per task
     replan_on_failure: bool = True
     max_replans: int = 3
+    enabled: bool = True  # Ignored in pure_rl mode
+
+
+@dataclass
+class UnitTestRewardsConfig:
+    """Configuration for deterministic unit-test-style rewards."""
+    enabled: bool = True
+    bundles_path: str = "data/test-bundles.json"
+    enable_tier1: bool = True
+    enable_tier2: bool = True
+    enable_tier3: bool = True
+    enable_penalties: bool = True
+    tier1_weight: float = 1.0
+    tier2_weight: float = 1.0
+    tier3_weight: float = 1.0
+    penalty_weight: float = 1.0
+    use_once_constraints: bool = True
+    reward_decay: float = 0.0
 
 
 @dataclass
 class ExperimentConfig:
     name: str = "default"
     description: str = ""
+
+    # Execution mode
+    agent_mode: Literal["hierarchical_llm", "pure_rl"] = "hierarchical_llm"
+    reward_mode: Literal["shaping", "unit_tests", "mixed"] = "shaping"
+    seed: int = 42
 
     # Target checkpoint (0 = as far as possible)
     target_checkpoint: int = 0
@@ -60,6 +88,7 @@ class ExperimentConfig:
     llm: LLMConfig = field(default_factory=LLMConfig)
     policy: PolicyConfig = field(default_factory=PolicyConfig)
     task: TaskConfig = field(default_factory=TaskConfig)
+    unit_tests: UnitTestRewardsConfig = field(default_factory=UnitTestRewardsConfig)
 
     # Output
     runs_dir: str = "runs"
@@ -76,12 +105,16 @@ class ExperimentConfig:
         return cls(
             name=data.get("name", "default"),
             description=data.get("description", ""),
+            agent_mode=data.get("agent_mode", "hierarchical_llm"),
+            reward_mode=data.get("reward_mode", "shaping"),
+            seed=data.get("seed", 42),
             target_checkpoint=data.get("target_checkpoint", 0),
             max_steps=data.get("max_steps", 100000),
             emulator=EmulatorConfig(**data.get("emulator", {})),
             llm=LLMConfig(**data.get("llm", {})),
             policy=PolicyConfig(**data.get("policy", {})),
             task=TaskConfig(**data.get("task", {})),
+            unit_tests=UnitTestRewardsConfig(**data.get("unit_tests", {})),
             runs_dir=data.get("runs_dir", "runs"),
             save_checkpoints=data.get("save_checkpoints", True),
             checkpoint_interval=data.get("checkpoint_interval", 1),

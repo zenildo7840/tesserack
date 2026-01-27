@@ -44,12 +44,17 @@ export const experimentRuns = writable([]);
 // Load walkthrough graph
 export async function loadWalkthroughGraph() {
     try {
+        console.log('[Lab] Loading walkthrough graph...');
         const response = await fetch('/data/walkthrough-graph.json');
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
         const data = await response.json();
+        console.log(`[Lab] Loaded graph: ${data.nodes?.length || 0} nodes, ${data.edges?.length || 0} edges`);
         walkthroughGraph.set(data);
         return data;
     } catch (e) {
-        console.error('Failed to load walkthrough graph:', e);
+        console.error('[Lab] Failed to load walkthrough graph:', e);
         return null;
     }
 }
@@ -166,5 +171,40 @@ export const completionPercentage = derived(
         const totalObjectives = $graph.nodes.filter(n => n.type === 'objective').length;
         if (totalObjectives === 0) return 0;
         return Math.round(($completed.size / totalObjectives) * 100);
+    }
+);
+
+// Derived: next graph location (first unvisited location reachable from current)
+export const nextGraphLocation = derived(
+    [walkthroughGraph, currentGraphLocation, completedObjectives],
+    ([$graph, $current, $completed]) => {
+        if (!$graph.edges?.length || !$current) return null;
+
+        // Find the current location node
+        const currentNode = $graph.nodes.find(n =>
+            n.name === $current || n.id === $current
+        );
+        if (!currentNode) return null;
+
+        // Find edges leading FROM current location
+        const outgoingEdges = $graph.edges.filter(e =>
+            e.from === currentNode.id && e.type === 'leads_to'
+        );
+
+        // Find the first destination that isn't completed
+        for (const edge of outgoingEdges) {
+            const destNode = $graph.nodes.find(n => n.id === edge.to);
+            if (destNode && !$completed.has(destNode.name) && !$completed.has(destNode.id)) {
+                return destNode.name;
+            }
+        }
+
+        // If all immediate destinations are completed, return the first anyway
+        if (outgoingEdges.length > 0) {
+            const firstDest = $graph.nodes.find(n => n.id === outgoingEdges[0].to);
+            if (firstDest) return firstDest.name;
+        }
+
+        return null;
     }
 );

@@ -177,8 +177,9 @@
 
     <div class="runner-form">
         <div class="form-group">
-            <label>Experiment Name</label>
+            <label for="exp-name">Experiment Name</label>
             <input
+                id="exp-name"
                 type="text"
                 bind:value={experimentName}
                 placeholder="e.g., query_frequency_sweep"
@@ -187,8 +188,8 @@
 
         <div class="form-row">
             <div class="form-group">
-                <label>Variable to Sweep</label>
-                <select bind:value={selectedVariable}>
+                <label for="var-sweep">Variable to Sweep</label>
+                <select id="var-sweep" bind:value={selectedVariable}>
                     {#each variables as v}
                         <option value={v.id}>{v.label}</option>
                     {/each}
@@ -196,8 +197,9 @@
             </div>
 
             <div class="form-group">
-                <label>Values ({variables.find(v => v.id === selectedVariable)?.unit})</label>
+                <label for="var-values">Values ({variables.find(v => v.id === selectedVariable)?.unit})</label>
                 <input
+                    id="var-values"
                     type="text"
                     bind:value={variableValues}
                     placeholder="1, 5, 10, 25"
@@ -207,8 +209,9 @@
 
         <div class="form-row">
             <div class="form-group">
-                <label>Runs per Config</label>
+                <label for="runs-per-config">Runs per Config</label>
                 <input
+                    id="runs-per-config"
                     type="number"
                     bind:value={runsPerConfig}
                     min="1"
@@ -217,8 +220,8 @@
             </div>
 
             <div class="form-group">
-                <label>Target Checkpoint</label>
-                <select bind:value={targetCheckpoint}>
+                <label for="target-checkpoint">Target Checkpoint</label>
+                <select id="target-checkpoint" bind:value={targetCheckpoint}>
                     {#each checkpoints as cp}
                         <option value={cp}>{cp}</option>
                     {/each}
@@ -415,7 +418,7 @@
     }
 
     .export-btn:hover {
-        background: var(--bg-hover);
+        background: var(--bg-input);
     }
 
     .results-table {
@@ -464,7 +467,7 @@
     }
 
     .icon-btn:hover {
-        background: var(--bg-hover);
+        background: var(--bg-input);
         color: var(--text-secondary);
     }
 

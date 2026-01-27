@@ -3,6 +3,8 @@
 from pathlib import Path
 from typing import Optional
 import time
+import random
+import numpy as np
 
 from .emulator import Emulator
 from .state import StateReader, GameState
@@ -12,6 +14,7 @@ from .policy import PolicyNetwork, Experience, ACTION_TO_IDX
 from .metrics import MetricsLogger
 from .config import ExperimentConfig, CHECKPOINTS
 from .server import LabServerSync
+from .unit_tests import UnitTestRewarder
 
 
 class Harness:
@@ -23,11 +26,21 @@ class Harness:
         self.current_checkpoint = 0
         self.enable_server = enable_server
 
+        # Initialize seeds for reproducibility
+        self._init_seeds()
+
         # Initialize components
         self._init_emulator()
-        self._init_llm()
+
+        # In pure_rl mode, LLM is not part of the runtime loop
+        if self.config.agent_mode == "hierarchical_llm":
+            self._init_llm()
+        else:
+            self.planner = None
+
         self._init_policy()
         self._init_metrics()
+        self._init_rewarder()
 
         if enable_server:
             self._init_server()
@@ -39,6 +52,22 @@ class Harness:
         self.current_task: Optional[Task] = None
         self.replan_count = 0
 
+    def _init_seeds(self):
+        """Initialize random seeds for reproducibility."""
+        random.seed(self.config.seed)
+        np.random.seed(self.config.seed)
+
+    def _init_rewarder(self):
+        """Initialize unit test rewarder."""
+        self.unit_rewarder = UnitTestRewarder(self.config.unit_tests)
+
+    def _dummy_task(self) -> Optional[Task]:
+        """Get dummy task for pure RL mode."""
+        if self.config.policy.ignore_task:
+            return None
+        # Constant task vector for compatibility
+        return Task(type=TaskType.NAVIGATE, target="(pure_rl)", status=TaskStatus.ACTIVE)
+
     def _init_emulator(self):
         """Initialize emulator and state reader."""
         self.emulator = Emulator(
@@ -48,9 +77,14 @@ class Harness:
         )
         self.state_reader = StateReader(self.emulator)
 
-        # Load save state if specified
+        # Load save state if specified, otherwise boot through intro
         if self.config.emulator.save_state_path:
             self.emulator.load_state(self.config.emulator.save_state_path)
+            # Warm up a few frames for stable RAM reads
+            self.emulator.step(60)
+        else:
+            # Boot through title screen and intro
+            self.emulator.boot_to_game(state_reader=self.state_reader)
 
     def _init_llm(self):
         """Initialize LLM backend and planner."""
@@ -107,6 +141,7 @@ class Harness:
     def run(self) -> bool:
         """Run the main loop until target or max steps reached."""
         print(f"Starting experiment: {self.config.name}")
+        print(f"Mode: {self.config.agent_mode}, Reward: {self.config.reward_mode}")
         print(f"Target: Checkpoint {self.config.target_checkpoint or 'max'}")
         print(f"Max steps: {self.config.max_steps}")
         print()
@@ -138,13 +173,17 @@ class Harness:
                     self.metrics.log_death()
                     print("  [DEATH] Whited out!")
 
-                # Get or continue task
-                if self.current_task is None or self.current_task.status != TaskStatus.ACTIVE:
-                    self._get_next_task(state)
+                # Execute based on mode
+                if self.config.agent_mode == "pure_rl":
+                    # Pure RL: policy selects actions every step
+                    self._execute_pure_rl_step(state)
+                else:
+                    # Hierarchical mode (existing behavior)
+                    if self.current_task is None or self.current_task.status != TaskStatus.ACTIVE:
+                        self._get_next_task(state)
 
-                # Execute task
-                if self.current_task:
-                    self._execute_task_step(state)
+                    if self.current_task:
+                        self._execute_task_step(state)
 
                 # Periodic training
                 if self.total_steps % self.config.policy.train_every == 0:
@@ -321,6 +360,99 @@ class Harness:
         if self.total_steps % 100 == 0:
             print(f"  Step {self.total_steps}, Task: {task.steps_taken}/{task.budget}")
 
+    def _execute_pure_rl_step(self, state: GameState):
+        """
+        Pure RL step:
+          a ~ pi_theta(.|s)
+          env step
+          r = unit_tests(prev,curr) (+ optional shaping)
+          store exp
+        """
+        task = self._dummy_task()
+        prev_state = state
+
+        # Select action from policy
+        action = self.policy.select_action(prev_state, task, self.epsilon)
+
+        # Encode state/task
+        state_enc = self.policy.encode_state(prev_state)
+        task_enc = self.policy.encode_task(task)
+
+        # Execute action in emulator
+        if action != "none":
+            self.emulator.press(
+                action,
+                hold_frames=self.config.emulator.action_hold_frames,
+                release_frames=self.config.emulator.action_release_frames,
+                frame_skip=self.config.emulator.frame_skip,
+            )
+        else:
+            self.emulator.step(self.config.emulator.frame_skip or 4)
+
+        # Read new state
+        new_state = self.state_reader.read()
+
+        # Compute reward based on mode
+        reward = 0.0
+        breakdown = None
+        fired = []
+
+        if self.config.reward_mode in ("unit_tests", "mixed"):
+            r_ut, breakdown, fired = self.unit_rewarder.reward(prev_state, new_state)
+            reward += r_ut
+
+        if self.config.reward_mode in ("shaping", "mixed"):
+            # Reuse existing shaping reward with dummy task
+            dummy = task or Task(type=TaskType.NAVIGATE, target="(pure_rl)")
+            reward += self._compute_reward(prev_state, new_state, dummy)
+
+        # Store experience
+        new_state_enc = self.policy.encode_state(new_state)
+        exp = Experience(
+            state_encoding=state_enc,
+            task_encoding=task_enc,
+            action=ACTION_TO_IDX[action],
+            reward=reward,
+            next_state_encoding=new_state_enc,
+            done=False,
+        )
+        self.policy.store_experience(exp)
+
+        self.total_steps += 1
+
+        # Broadcast to WebSocket clients (throttled to reduce overhead)
+        if self.server and self.total_steps % 5 == 0:
+            # Send frame every 5 steps
+            frame_data = self.emulator.get_screen_png()
+            if frame_data:
+                self.server.send_frame(frame_data)
+            # Send game state
+            self.server.send_state(new_state.to_dict())
+            # Send RL-specific step data
+            rl_data = {
+                "step": self.total_steps,
+                "action": action,
+                "reward": reward,
+                "epsilon": self.epsilon,
+                "tier1": breakdown.tier1 if breakdown else 0.0,
+                "tier2": breakdown.tier2 if breakdown else 0.0,
+                "tier3": breakdown.tier3 if breakdown else 0.0,
+                "penalties": breakdown.penalties if breakdown else 0.0,
+                "fired_tests": fired,
+            }
+            self.server.send_rl_step(rl_data)
+
+        # Progress indicator with reward breakdown
+        if self.total_steps % 250 == 0:
+            if breakdown is not None:
+                print(
+                    f"  [RL] step={self.total_steps} r={reward:.3f} "
+                    f"tier1={breakdown.tier1:.2f} tier2={breakdown.tier2:.2f} "
+                    f"tier3={breakdown.tier3:.2f} pen={breakdown.penalties:.2f}"
+                )
+            else:
+                print(f"  [RL] step={self.total_steps} r={reward:.3f}")
+
     def _compute_reward(
         self,
         prev_state: GameState,
@@ -415,6 +547,10 @@ class Harness:
     def _finalize(self, success: bool):
         """Finalize the run."""
         state = self.state_reader.read()
+
+        # Update total steps in metrics (especially important for pure RL mode)
+        self.metrics.run_metrics.total_steps = self.total_steps
+
         self.metrics.finalize(
             success=success,
             final_badges=state.badge_count,

@@ -24,6 +24,7 @@ class MessageType(str, Enum):
     CHECKPOINT = "checkpoint"
     METRICS = "metrics"
     STATUS = "status"
+    RL_STEP = "rl_step"  # Pure RL mode step data
 
     # Client -> Server
     COMMAND = "command"
@@ -208,6 +209,11 @@ class LabServer:
         self.state.total_steps = metrics.get("total_steps", 0)
         await self.broadcast(MessageType.METRICS, metrics)
 
+    async def send_rl_step(self, step_data: dict):
+        """Send pure RL step data (action, rewards, epsilon)."""
+        self.state.total_steps = step_data.get("step", 0)
+        await self.broadcast(MessageType.RL_STEP, step_data)
+
     def update_status(self, **kwargs):
         """Update server state (called synchronously)."""
         for key, value in kwargs.items():
@@ -231,6 +237,7 @@ class LabServerSync:
         self.server = LabServer(host, port)
         self._loop: Optional[asyncio.AbstractEventLoop] = None
         self._thread = None
+        self._ready = False
 
     def start(self):
         """Start server in background thread."""
@@ -239,8 +246,14 @@ class LabServerSync:
         def run_server():
             self._loop = asyncio.new_event_loop()
             asyncio.set_event_loop(self._loop)
-            self._loop.run_until_complete(self.server.start())
-            self._loop.run_forever()
+            try:
+                self._loop.run_until_complete(self.server.start())
+                self._ready = True
+                print("WebSocket server started on ws://localhost:8765")
+                self._loop.run_forever()
+            except Exception as e:
+                print(f"WebSocket server failed to start: {e}")
+                self._ready = False
 
         self._thread = threading.Thread(target=run_server, daemon=True)
         self._thread.start()
@@ -256,6 +269,10 @@ class LabServerSync:
 
     def _run_async(self, coro):
         """Run async coroutine from sync context."""
+        if not self._ready:
+            # Server not ready, close the coroutine to avoid "never awaited" warning
+            coro.close()
+            return
         if self._loop and self._loop.is_running():
             future = asyncio.run_coroutine_threadsafe(coro, self._loop)
             try:
@@ -263,6 +280,9 @@ class LabServerSync:
             except Exception as e:
                 # Don't crash on send failures
                 pass
+        else:
+            # Close the coroutine to avoid warning
+            coro.close()
 
     def send_frame(self, frame_data: bytes):
         self._run_async(self.server.send_frame(frame_data))
@@ -284,6 +304,9 @@ class LabServerSync:
 
     def send_metrics(self, metrics: dict):
         self._run_async(self.server.send_metrics(metrics))
+
+    def send_rl_step(self, step_data: dict):
+        self._run_async(self.server.send_rl_step(step_data))
 
     def update_status(self, **kwargs):
         self.server.update_status(**kwargs)

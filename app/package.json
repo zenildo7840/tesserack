@@ -1,7 +1,7 @@
 {
   "name": "tesserack",
   "version": "1.0.0",
-  "description": "AI Plays Pokemon - Browser Edition",
+  "description": "Reinforcement learning test bed for game environments - supports LLM-guided and Pure RL modes",
   "type": "module",
   "scripts": {
     "dev": "vite dev",

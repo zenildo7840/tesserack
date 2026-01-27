@@ -35,7 +35,13 @@ class Emulator:
         for _ in range(frames):
             self.pyboy.tick()
 
-    def press(self, button: str, hold_frames: int = 8, release_frames: int = 4) -> None:
+    def press(
+        self,
+        button: str,
+        hold_frames: int = 8,
+        release_frames: int = 4,
+        frame_skip: int = 0,
+    ) -> None:
         """Press a button and release it."""
         valid_buttons = {"a", "b", "start", "select", "up", "down", "left", "right"}
         button = button.lower()
@@ -46,6 +52,8 @@ class Emulator:
         self.step(hold_frames)
         self.pyboy.button_release(button)
         self.step(release_frames)
+        if frame_skip > 0:
+            self.step(frame_skip)
 
     def read_memory(self, address: int) -> int:
         """Read a single byte from memory."""
@@ -82,6 +90,58 @@ class Emulator:
         except Exception:
             # Pillow not installed or other error
             return None
+
+    def boot_to_game(self, state_reader=None, max_presses: int = 3000) -> bool:
+        """
+        Boot past title screen and intro to playable game state.
+
+        Uses similar logic to the browser app's startIntroSkip():
+        - Alternates between A, Start, Down, Right to handle menus and text
+        - Checks for party Pokemon to detect when intro is complete
+
+        Args:
+            state_reader: Optional StateReader to check for party (intro complete)
+            max_presses: Maximum button presses before timeout
+
+        Returns True if successfully booted to game, False if timed out.
+        """
+        print("Booting game (skipping intro)...")
+
+        # Wait for title screen to appear
+        self.step(60)
+
+        for step in range(max_presses):
+            # Check if intro is complete (player has a Pokemon)
+            if state_reader and step % 20 == 0:
+                try:
+                    state = state_reader.read()
+                    if len(state.party) > 0:
+                        print(f"  Intro complete! Starter Pokemon received after {step} presses.")
+                        self.step(30)  # Let game settle
+                        return True
+                except:
+                    pass  # Ignore read errors during intro
+
+            # Button sequence (matching browser app logic)
+            if step % 10 == 0:
+                # Occasionally press Start (for title screen)
+                self.press("start", hold_frames=5, release_frames=5)
+            elif step % 5 == 0:
+                # Navigate down in menus
+                self.press("down", hold_frames=4, release_frames=4)
+            elif step % 7 == 0:
+                # Navigate right in name entry
+                self.press("right", hold_frames=4, release_frames=4)
+            else:
+                # Mostly mash A to advance text
+                self.press("a", hold_frames=4, release_frames=4)
+
+            # Progress indicator
+            if step % 200 == 0 and step > 0:
+                print(f"  ... {step} presses")
+
+        print(f"  Boot sequence timed out after {max_presses} presses.")
+        return False
 
     def close(self) -> None:
         """Clean up emulator."""

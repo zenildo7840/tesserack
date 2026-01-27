@@ -73,6 +73,9 @@ def main():
     # Load or create config
     if args.config:
         config = ExperimentConfig.from_file(args.config)
+        # Override headless if --show is specified
+        if args.show:
+            config.emulator.headless = False
     else:
         config = ExperimentConfig(
             name=f"run_{args.model.replace(':', '_')}",
