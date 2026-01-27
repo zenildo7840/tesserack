@@ -159,11 +159,12 @@
             <button
                 class="dropdown-trigger"
                 class:active={$romLoaded}
+                class:highlight={!$romLoaded}
                 on:click|stopPropagation={() => romDropdownOpen = !romDropdownOpen}
                 title="Load or manage ROM"
             >
                 <Upload size={16} />
-                <span>{$romLoaded ? 'Pokemon Red' : 'No ROM'}</span>
+                <span>{$romLoaded ? 'Pokemon Red' : 'Load ROM'}</span>
                 <ChevronDown size={14} />
             </button>
 
@@ -698,6 +699,23 @@
 
     .dropdown-trigger :global(.warning-icon) {
         color: var(--accent-warning);
+    }
+
+    .dropdown-trigger.highlight {
+        border-color: var(--accent-primary);
+        border-width: 2px;
+        background: rgba(116, 185, 255, 0.08);
+        color: var(--accent-primary);
+        animation: pulse-border 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse-border {
+        0%, 100% {
+            box-shadow: 0 0 0 0 rgba(116, 185, 255, 0.4);
+        }
+        50% {
+            box-shadow: 0 0 0 4px rgba(116, 185, 255, 0);
+        }
     }
 
     .dropdown-panel {

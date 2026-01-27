@@ -58,11 +58,6 @@
     {#if viewMode === 'lab'}
         <!-- Lab Mode (Default) -->
         <main class="lab-content">
-            {#if !$romLoaded}
-                <div class="lab-prompt">
-                    <p>Load a ROM using the dropdown above to begin</p>
-                </div>
-            {/if}
             <div class="lab-layout">
                 <div class="lab-main">
                     <LabView />
@@ -240,7 +235,6 @@
         }
     }
 
-    .lab-prompt,
     .play-prompt {
         display: flex;
         align-items: center;
@@ -252,9 +246,6 @@
         text-align: center;
         color: var(--text-muted);
         font-size: 14px;
-    }
-
-    .play-prompt {
         aspect-ratio: 160 / 144;
     }
 
