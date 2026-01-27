@@ -1,7 +1,8 @@
 <script>
     import { onMount } from 'svelte';
-    import { Map, Target, Zap, Settings, Play, Pause, RotateCcw } from 'lucide-svelte';
+    import { Map, Target, Zap, Settings, Play, Pause, RotateCcw, FlaskConical } from 'lucide-svelte';
     import WalkthroughGraph from './WalkthroughGraph.svelte';
+    import ExperimentRunner from './ExperimentRunner.svelte';
     import {
         walkthroughGraph,
         currentGraphLocation,
@@ -18,6 +19,7 @@
     let graphComponent;
     let isRunning = false;
     let showConfig = false;
+    let showExperiments = false;
 
     onMount(async () => {
         await loadWalkthroughGraph();
@@ -68,6 +70,9 @@
             </button>
             <button class="control-btn" on:click={() => showConfig = !showConfig} title="Settings">
                 <Settings size={16} />
+            </button>
+            <button class="control-btn" class:active={showExperiments} on:click={() => showExperiments = !showExperiments} title="Experiments">
+                <FlaskConical size={16} />
             </button>
             <button class="control-btn primary" on:click={toggleRun}>
                 {#if isRunning}
@@ -221,9 +226,24 @@
             <button class="config-close" on:click={() => showConfig = false}>Done</button>
         </div>
     {/if}
+
+    <!-- Experiment Runner Panel -->
+    {#if showExperiments}
+        <div class="experiment-panel">
+            <ExperimentRunner />
+        </div>
+    {/if}
 </div>
 
 <style>
+    .experiment-panel {
+        position: absolute;
+        top: 80px;
+        right: 20px;
+        width: 340px;
+        max-height: calc(100vh - 200px);
+        overflow-y: auto;
+    }
     .lab-view {
         display: flex;
         flex-direction: column;
@@ -278,6 +298,11 @@
     .control-btn:hover {
         background: var(--bg-hover);
         color: var(--text-primary);
+    }
+
+    .control-btn.active {
+        background: var(--accent-secondary);
+        color: white;
     }
 
     .control-btn.primary {
