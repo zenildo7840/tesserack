@@ -8,7 +8,14 @@
     import { hasROM, loadROM, saveROM } from '$lib/core/persistence.js';
     import { startIntroSkip } from '$lib/core/game-init.js';
     import { testConnection } from '$lib/core/llm.js';
-    import { Cpu, CheckCircle, Info, Github, ChevronDown, ChevronUp, X, Zap, Sun, Moon, Upload, PlayCircle, FastForward, Settings, AlertCircle, Check, RefreshCw } from 'lucide-svelte';
+    import { Cpu, CheckCircle, Info, Github, ChevronDown, ChevronUp, X, Zap, Sun, Moon, Upload, PlayCircle, FastForward, Settings, AlertCircle, Check, RefreshCw, Radio, FlaskConical, Gamepad2 } from 'lucide-svelte';
+    import { twitchStatus } from '$lib/stores/twitch.js';
+
+    // View mode props
+    export let viewMode = 'lab';
+    export let onViewModeChange = (mode) => {};
+
+    $: isLive = $twitchStatus.isLive;
 
     let aboutOpen = false;
     let romDropdownOpen = false;
@@ -152,6 +159,38 @@
             </div>
         </div>
     </div>
+
+    <nav class="header-tabs">
+        <button
+            class="tab"
+            class:active={viewMode === 'watch'}
+            class:live={isLive}
+            on:click={() => onViewModeChange('watch')}
+        >
+            {#if isLive}
+                <span class="live-dot"></span>
+            {:else}
+                <Radio size={16} />
+            {/if}
+            <span>Watch</span>
+        </button>
+        <button
+            class="tab"
+            class:active={viewMode === 'lab'}
+            on:click={() => onViewModeChange('lab')}
+        >
+            <FlaskConical size={16} />
+            <span>Lab</span>
+        </button>
+        <button
+            class="tab"
+            class:active={viewMode === 'classic'}
+            on:click={() => onViewModeChange('classic')}
+        >
+            <Gamepad2 size={16} />
+            <span>Play</span>
+        </button>
+    </nav>
 
     <div class="header-center">
         <!-- ROM Dropdown -->
@@ -668,6 +707,73 @@
     .theme-toggle:hover {
         background: var(--bg-dark);
         color: var(--accent-warning);
+    }
+
+    /* Header tabs */
+    .header-tabs {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        padding: 4px;
+        background: var(--bg-input);
+        border-radius: 10px;
+    }
+
+    .tab {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 16px;
+        background: transparent;
+        border: none;
+        border-radius: 8px;
+        color: var(--text-muted);
+        font-size: 13px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.15s;
+    }
+
+    .tab:hover {
+        color: var(--text-secondary);
+        background: var(--bg-panel);
+    }
+
+    .tab.active {
+        background: var(--bg-panel);
+        color: var(--accent-primary);
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+
+    .tab.active :global(svg) {
+        color: var(--accent-primary);
+    }
+
+    .tab.live {
+        color: var(--text-primary);
+    }
+
+    .tab.live:not(.active) {
+        background: rgba(231, 76, 60, 0.1);
+    }
+
+    .live-dot {
+        width: 8px;
+        height: 8px;
+        background: #e74c3c;
+        border-radius: 50%;
+        animation: pulse-dot 1.5s ease-in-out infinite;
+    }
+
+    @keyframes pulse-dot {
+        0%, 100% {
+            opacity: 1;
+            transform: scale(1);
+        }
+        50% {
+            opacity: 0.6;
+            transform: scale(0.9);
+        }
     }
 
     /* Header center - dropdowns */

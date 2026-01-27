@@ -16,6 +16,7 @@
     import AdvancedPanel from '$lib/components/AdvancedPanel.svelte';
     import ModelStatus from '$lib/components/ModelStatus.svelte';
     import LabView from '$lib/components/lab/LabView.svelte';
+    import WatchView from '$lib/components/WatchView.svelte';
 
     // Stores
     import { romLoaded, gameState } from '$lib/stores/game';
@@ -23,15 +24,15 @@
     import { modelState } from '$lib/stores/training';
     import { feedSystem } from '$lib/stores/feed';
 
-    // View mode: 'lab' (default) or 'classic'
+    // View mode: 'lab' (default), 'watch', or 'classic'
     let viewMode = 'lab';
     let mounted = false;
 
     onMount(() => {
         // Restore last view mode (but default to lab)
         const savedMode = localStorage.getItem('tesserack_viewMode');
-        if (savedMode === 'classic') {
-            viewMode = 'classic';
+        if (savedMode === 'watch' || savedMode === 'classic') {
+            viewMode = savedMode;
         }
         mounted = true;
 
@@ -43,20 +44,18 @@
         localStorage.setItem('tesserack_viewMode', viewMode);
     }
 
-    function switchToClassic() {
-        viewMode = 'classic';
-    }
-
-    function switchToLab() {
-        viewMode = 'lab';
-    }
 </script>
 
 <div class="app">
-    <Header />
+    <Header {viewMode} onViewModeChange={(mode) => viewMode = mode} />
 
-    {#if viewMode === 'lab'}
-        <!-- Lab Mode (Default) -->
+    {#if viewMode === 'watch'}
+        <!-- Watch Mode (Default) - Live stream -->
+        <main class="watch-content">
+            <WatchView />
+        </main>
+    {:else if viewMode === 'lab'}
+        <!-- Lab Mode - Train your own -->
         <main class="lab-content">
             <div class="lab-layout">
                 <div class="lab-main">
@@ -64,19 +63,11 @@
                 </div>
                 <div class="lab-sidebar">
                     <ActivityFeed />
-                    <button class="classic-link" on:click={switchToClassic}>
-                        Switch to Classic view
-                    </button>
                 </div>
             </div>
         </main>
     {:else}
         <!-- Classic Mode -->
-        <div class="classic-header">
-            <button class="back-to-lab" on:click={switchToLab}>
-                &larr; Back to Lab
-            </button>
-        </div>
         <main class="main-content">
             <div class="left-column">
                 {#if !$romLoaded}
@@ -141,50 +132,19 @@
         flex-direction: column;
     }
 
+    .watch-content {
+        flex: 1;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+    }
+
     .lab-content {
         margin-top: 8px;
         min-height: 800px;
         flex: 1;
     }
 
-    .classic-link {
-        display: block;
-        width: 100%;
-        padding: 10px;
-        margin-top: 8px;
-        background: transparent;
-        border: 1px dashed var(--border-color);
-        border-radius: 6px;
-        color: var(--text-muted);
-        font-size: 12px;
-        cursor: pointer;
-        transition: all 0.15s;
-        text-align: center;
-    }
-
-    .classic-link:hover {
-        color: var(--text-secondary);
-        border-color: var(--text-muted);
-    }
-
-    .classic-header {
-        margin-top: 16px;
-        margin-bottom: 8px;
-    }
-
-    .back-to-lab {
-        padding: 8px 12px;
-        background: transparent;
-        border: none;
-        color: var(--text-muted);
-        font-size: 13px;
-        cursor: pointer;
-        transition: color 0.15s;
-    }
-
-    .back-to-lab:hover {
-        color: var(--accent-primary);
-    }
 
     .lab-layout {
         display: grid;
