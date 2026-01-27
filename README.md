@@ -1,34 +1,45 @@
 # Tesserack
 
-Experimental reinforcement learning infrastructure for studying hierarchical task decomposition in game environments.
+**Compiling strategy guides into reward functions for reinforcement learning.**
 
-[![Live Demo](https://img.shields.io/badge/demo-live-brightgreen)](https://sidmohan0.github.io/tesserack/)
+[![Live Demo](https://img.shields.io/badge/demo-tesserack.ai-brightgreen)](https://tesserack.ai)
 
-> **Lab Mode (Experimental)**
-> This repository contains experimental reinforcement learning infrastructure for studying credit assignment via deterministic reward specifications. Results are exploratory and configurations may change.
+## What is this?
 
-## Overview
+Most RL game agents learn from scratch with sparse rewards ("you won" / "you lost"). Tesserack takes a different approach: it uses an LLM to read a strategy guide and extract structured "unit tests" that fire as dense rewards throughout gameplay.
 
-Tesserack is a research test bed for studying reinforcement learning in game environments. It supports two execution modes:
+The strategy guide becomes a curriculum. Instead of stumbling randomly until the agent accidentally beats Brock, it gets rewarded for:
+- Walking toward the gym (+0.1)
+- Entering the gym door (+2.0)
+- Winning the badge (+50.0)
 
-- **Hierarchical mode**: Language model handles task decomposition, policy network executes
-- **Pure RL mode**: Policy network acts directly, rewards from deterministic unit tests
+## How it works
 
-The environment is Pokemon Red, chosen for its deterministic mechanics and well-documented memory layout.
+```
+Human Knowledge     →  LLM Compiler  →  Unit Test Rewards  →  RL Agent
+(Prima Guide PDF)      (Claude Vision)   (test-bundles.json)   (REINFORCE)
+```
 
-**Two interfaces:**
+1. **Extract**: Claude Vision reads pages from the Prima Strategy Guide and extracts locations, objectives, and map coordinates
+2. **Compile**: Extractions become tiered unit tests (movement → landmarks → objectives)
+3. **Train**: REINFORCE policy network gets dense rewards as tests fire
 
-| | Browser | Lab |
-|---|---------|-----|
-| **Purpose** | Interactive demo | Research experiments |
-| **Setup** | Zero (just open it) | Python environment |
-| **Models** | WebLLM (1-3B) or API | Any (local or API) |
-| **Speed** | Real-time | 10x+ (headless) |
-| **Location** | `app/` | `lab/` |
+The LLM acts as a "compiler" that translates human-readable instructions into machine-executable reward signals.
 
-## Browser Version
+### Reward Tiers
 
-Zero-setup demo running entirely client-side via WebGPU.
+| Tier | What It Rewards | Example | Reward |
+|------|-----------------|---------|--------|
+| **Tier 1** | Micro movement | Coordinates changed, moved toward objective | 0.1 - 0.2 |
+| **Tier 2** | Landmarks | Reached Oak's Lab region, entered a door | 2.0 - 5.0 |
+| **Tier 3** | Objectives | Got starter Pokemon, earned badge | 10.0 - 50.0 |
+| **Penalties** | Bad behavior | Stuck for 30+ frames | -0.5 |
+
+### Inspired by OLMoCR-2
+
+[OLMoCR-2](https://allenai.org/blog/olmocr) showed that unit tests make excellent reward signals - deterministic, interpretable, and dense. Tesserack applies that insight to game playing: the strategy guide's objectives become the "unit tests" that shape agent behavior.
+
+## Quick Start
 
 ```bash
 cd app
@@ -36,59 +47,42 @@ npm install
 npm run dev
 ```
 
+Open http://localhost:5173, drop a Pokemon Red ROM, and switch to **Train** mode.
+
 **Requirements:** Chrome/Edge 113+ (WebGPU), Pokemon Red ROM
 
-**Features:**
-- **LLM Mode**: Language model via WebLLM or external APIs (OpenAI, Groq, local)
-- **Pure RL Mode**: No LLM calls - simple policy network with epsilon-greedy exploration and deterministic unit-test rewards (toggle via "Pure RL" button in Lab)
-- Policy network training visualization
-- Game state inspection
-- Real-time reward breakdown (tier1/tier2/tier3/penalties)
+## Features
 
-## Lab (Experimental)
+- **Pure RL Mode**: REINFORCE policy network with unit test rewards (no LLM at runtime)
+- **LLM Mode**: Browser-based language model for task decomposition
+- **675 pre-compiled tests** across 41 locations from the Prima Guide
+- **Real-time visualization**: reward breakdown, policy entropy, training metrics
+- **Export/Import**: backup and restore all training data and save states
 
-For running experiments, comparing configurations, and exploring training dynamics.
+## Extraction Pipeline
+
+To regenerate test bundles from the Prima Guide (requires Anthropic API key):
 
 ```bash
-cd lab
-pip install -r requirements.txt
+# Download guide from archive.org
+npm run guide:download
 
-# Hierarchical mode (LLM + Policy)
-python scripts/run_experiment.py --rom pokemon_red.gb
+# Convert PDF pages to images
+npm run guide:extract-pages
 
-# Pure RL mode (no LLM, unit test rewards)
-python scripts/run_experiment.py configs/pure_rl_unit_tests.json
+# Extract structured data via Claude Vision
+ANTHROPIC_API_KEY=sk-... npm run guide:extract-claude
+
+# Compile into test bundles
+npm run guide:generate-bundles
+
+# Validate output
+npm run guide:validate
 ```
 
-**Requirements:** Python 3.10+, Pokemon Red ROM. Ollama only needed for hierarchical mode.
-
-**Features:**
-- Two execution modes: hierarchical (LLM+Policy) and pure RL
-- Deterministic unit-test-style rewards with tiered breakdown
-- Headless execution at 10x+ speed
-- Experiment logging and metrics
-
-See [lab/README.md](lab/README.md) for details.
+See [docs/EXTRACTION.md](docs/EXTRACTION.md) for details.
 
 ## Architecture
-
-### Hierarchical Mode (LLM + Policy)
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│   ┌─────────────┐         ┌─────────────┐                   │
-│   │     LLM     │  tasks  │   Policy    │  actions          │
-│   │  (Planner)  │────────▶│  (Executor) │─────────▶ Game    │
-│   └─────────────┘         └─────────────┘                   │
-│         ▲                       │                            │
-│         │                       │ learns                     │
-│         │   objective          ▼                            │
-│   ┌─────────────┐         ┌─────────────┐                   │
-│   │  Strategy   │         │ Experience  │                   │
-│   │   Guide     │         │   Buffer    │                   │
-│   └─────────────┘         └─────────────┘                   │
-└─────────────────────────────────────────────────────────────┘
-```
 
 ### Pure RL Mode (Unit Test Rewards)
 
@@ -96,33 +90,47 @@ See [lab/README.md](lab/README.md) for details.
 ┌─────────────────────────────────────────────────────────────┐
 │   ┌─────────────┐         ┌─────────────┐                   │
 │   │   Policy    │ action  │  Emulator   │  new state        │
-│   │   πθ(a|s)   │────────▶│   (PyBoy)   │─────────┐         │
+│   │   πθ(a|s)   │────────▶│  (binjgb)   │─────────┐         │
 │   └─────────────┘         └─────────────┘         │         │
 │         ▲                                         │         │
-│         │ learns                                  ▼         │
+│         │ REINFORCE                               ▼         │
 │   ┌─────────────┐         ┌─────────────────────────────┐   │
-│   │ Experience  │◀────────│  Unit Test Rewarder         │   │
-│   │   Buffer    │  reward │  tests(prev,curr) → r       │   │
+│   │  Rollout    │◀────────│  Unit Test Rewards          │   │
+│   │  Buffer     │  reward │  tests(prev, curr) → r      │   │
 │   └─────────────┘         └─────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-**Hierarchical mode**: LLM issues task-level goals, policy executes, learns from shaping rewards
+### LLM Mode (Guide-Enhanced)
 
-**Pure RL mode**: Policy acts directly every step, deterministic unit tests compute rewards
+```
+┌─────────────────────────────────────────────────────────────┐
+│   ┌─────────────┐         ┌─────────────┐                   │
+│   │  Browser    │  tasks  │   Policy    │  actions          │
+│   │  LLM        │────────▶│  (Executor) │─────────▶ Game    │
+│   └─────────────┘         └─────────────┘                   │
+│         ▲                       │                            │
+│         │                       │ learns                     │
+│         │ context               ▼                            │
+│   ┌─────────────┐         ┌─────────────┐                   │
+│   │  Walkthrough│         │  Reward     │                   │
+│   │  Graph      │         │  System     │                   │
+│   └─────────────┘         └─────────────┘                   │
+└─────────────────────────────────────────────────────────────┘
+```
 
-## Current Focus
+## Why This Matters
 
-Exploring whether hierarchical task decomposition enables small models (3B parameters) to make meaningful progress through early-game milestones.
-
-**Milestones under study:**
-- [ ] Brock (Boulder Badge)
-- [ ] Misty (Cascade Badge)
+1. **Reward engineering is hard** - Tesserack automates it by mining existing guides
+2. **Curriculum is implicit** - The guide's structure naturally provides learning progression
+3. **Transferable method** - Any game with a strategy guide could use this approach
+4. **Interpretable rewards** - You can see exactly which tests fired and why
 
 ## Links
 
-- [Live Demo](https://sidmohan0.github.io/tesserack/)
-- [Design Doc](docs/plans/2026-01-26-test-bed-harness-design.md)
+- [Live Demo](https://tesserack.ai)
+- [Design Doc](docs/plans/2026-01-27-precompiled-test-bundles-design.md)
+- [Extraction Instructions](docs/EXTRACTION.md)
 
 ## License
 
