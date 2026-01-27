@@ -112,13 +112,6 @@
         </div>
     {/if}
 
-    <footer class="info-footer">
-        <Info size={14} />
-        <p>
-            All data is stored locally in your browser. Your training progress, experiences, and AI model persist across sessions but are specific to this browser and device. Use the Export function to back up your data or transfer it elsewhere.
-        </p>
-    </footer>
-
     <footer class="credits-footer">
         <span>Made by Sid Mohan</span>
         <div class="credits-links">
@@ -140,15 +133,16 @@
 
 <style>
     .app {
-        max-width: 1100px;
+        max-width: 1400px;
         margin: 0 auto;
-        padding: 16px 12px;
+        padding: 12px 8px;
         min-height: 100vh;
     }
 
     .lab-content {
-        margin-top: 16px;
-        min-height: 600px;
+        margin-top: 8px;
+        min-height: 800px;
+        height: calc(100vh - 180px);
     }
 
     .classic-link {
@@ -192,12 +186,14 @@
 
     .lab-layout {
         display: grid;
-        grid-template-columns: 1fr 320px;
-        gap: 16px;
+        grid-template-columns: 1fr 340px;
+        gap: 12px;
+        height: 100%;
     }
 
     .lab-main {
         min-width: 0; /* Prevent grid blowout */
+        height: 100%;
     }
 
     .lab-sidebar {
@@ -272,28 +268,6 @@
         .main-content {
             grid-template-columns: 1fr;
         }
-    }
-
-    .info-footer {
-        display: flex;
-        align-items: flex-start;
-        gap: 8px;
-        margin-top: 24px;
-        padding: 12px 16px;
-        background: var(--bg-input);
-        border-radius: 8px;
-        color: var(--text-muted);
-        font-size: 12px;
-        line-height: 1.5;
-    }
-
-    .info-footer p {
-        margin: 0;
-    }
-
-    .info-footer :global(svg) {
-        flex-shrink: 0;
-        margin-top: 2px;
     }
 
     .credits-footer {

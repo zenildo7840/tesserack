@@ -428,8 +428,34 @@
             hoverNode = null;
         });
 
-        // Fit to view
-        cy.fit(undefined, 30);
+        // Fit to view with slight zoom
+        cy.fit(undefined, 20);
+        // Zoom in a bit more for better visibility
+        cy.zoom(cy.zoom() * 1.3);
+        cy.center();
+    }
+
+    // Control functions
+    function zoomIn() {
+        if (cy) {
+            cy.zoom(cy.zoom() * 1.3);
+            cy.center();
+        }
+    }
+
+    function zoomOut() {
+        if (cy) {
+            cy.zoom(cy.zoom() / 1.3);
+            cy.center();
+        }
+    }
+
+    function resetView() {
+        if (cy) {
+            cy.fit(undefined, 20);
+            cy.zoom(cy.zoom() * 1.3);
+            cy.center();
+        }
     }
 
     let previewDebounceTimer = null;
@@ -524,7 +550,7 @@
         resizeObserver = new ResizeObserver(() => {
             if (cy) {
                 cy.resize();
-                cy.fit(undefined, 30);
+                cy.center();
             }
         });
         if (container) {
@@ -559,46 +585,115 @@
     $: if (cy && nextLocation) {
         updateHighlights();
     }
+
+    // Auto-center on current location when it changes
+    $: if (cy && currentLocation) {
+        centerOnNode(currentLocation);
+    }
+
+    // Build current location info for the info panel
+    $: currentLocationInfo = buildLocationInfo(currentLocation, graphData, completedObjectives);
+
+    function buildLocationInfo(locName, data, completed) {
+        if (!locName || !data?.nodes?.length) return null;
+
+        // Map the location name
+        const mappedName = mapLocationToNode(locName);
+
+        // Find the location node
+        const locationNode = data.nodes.find(n =>
+            n.type === 'location' &&
+            (n.name === mappedName || n.name.toLowerCase() === mappedName?.toLowerCase())
+        );
+
+        if (!locationNode) return { name: locName, description: null, objectives: [], connections: [] };
+
+        // Find objectives at this location
+        const objectives = [];
+        for (const edge of data.edges) {
+            if (edge.from === locationNode.id && edge.type === 'contains') {
+                const target = data.nodes.find(n => n.id === edge.to);
+                if (target?.type === 'objective') {
+                    objectives.push({
+                        name: target.name,
+                        completed: completed.has(target.name) || completed.has(target.id)
+                    });
+                }
+            }
+        }
+
+        // Find connected locations
+        const connections = [];
+        for (const edge of data.edges) {
+            if (edge.type === 'leads_to') {
+                if (edge.from === locationNode.id) {
+                    const target = data.nodes.find(n => n.id === edge.to);
+                    if (target) connections.push({ name: target.name, direction: 'to' });
+                } else if (edge.to === locationNode.id) {
+                    const source = data.nodes.find(n => n.id === edge.from);
+                    if (source) connections.push({ name: source.name, direction: 'from' });
+                }
+            }
+        }
+
+        return {
+            name: locationNode.name,
+            description: locationNode.description,
+            objectives,
+            connections: [...new Map(connections.map(c => [c.name, c])).values()].slice(0, 4)
+        };
+    }
 </script>
 
-<div class="graph-wrapper">
-    <div class="graph-container" bind:this={container}></div>
+<div class="graph-wrapper split-view">
+    <!-- Left: Map -->
+    <div class="map-side">
+        <div class="graph-container" bind:this={container}></div>
+        <div class="map-controls">
+            <button class="map-ctrl-btn" on:click={zoomIn} title="Zoom In">+</button>
+            <button class="map-ctrl-btn" on:click={zoomOut} title="Zoom Out">−</button>
+            <button class="map-ctrl-btn" on:click={resetView} title="Reset View">⟲</button>
+        </div>
+    </div>
 
-    <!-- Hover Preview Panel -->
-    {#if showZoomPreview && (hoverNode || nearbyNodes.length > 0)}
-        <div class="hover-preview">
-            {#if hoverNode}
-                <div class="preview-main">
-                    <span class="preview-type" class:location={hoverNode.type === 'location'} class:objective={hoverNode.type === 'objective'} class:trainer={hoverNode.type === 'trainer'}>
-                        {hoverNode.type}
-                    </span>
-                    <span class="preview-label">{hoverNode.label}</span>
-                    {#if hoverNode.description}
-                        <p class="preview-desc">{hoverNode.description}</p>
-                    {/if}
-                    {#if hoverNode.objectives}
-                        <div class="preview-objectives">
-                            <span class="objectives-title">Objectives:</span>
-                            <span class="objectives-list">{hoverNode.objectives}</span>
-                        </div>
-                    {/if}
-                    {#if hoverNode.badge}
-                        <span class="preview-badge">Badge: {hoverNode.badge}</span>
-                    {/if}
-                </div>
-            {:else if nearbyNodes.length > 0}
-                <div class="preview-nearby">
-                    <span class="nearby-title">Nearby:</span>
-                    {#each nearbyNodes as node}
-                        <div class="nearby-item">
-                            <span class="nearby-dot" class:location={node.type === 'location'} class:objective={node.type === 'objective'} class:trainer={node.type === 'trainer'}></span>
-                            <span class="nearby-name">{node.label}</span>
-                        </div>
-                    {/each}
+    <!-- Right: Location Info -->
+    <div class="info-side">
+        {#if currentLocationInfo}
+            <div class="location-name">{currentLocationInfo.name}</div>
+            {#if currentLocationInfo.description}
+                <p class="location-desc">{currentLocationInfo.description}</p>
+            {/if}
+
+            {#if currentLocationInfo.objectives.length > 0}
+                <div class="info-section">
+                    <div class="info-label">Objectives</div>
+                    <ul class="objectives-list">
+                        {#each currentLocationInfo.objectives as obj}
+                            <li class:completed={obj.completed}>
+                                <span class="obj-marker">{obj.completed ? '✓' : '○'}</span>
+                                {obj.name}
+                            </li>
+                        {/each}
+                    </ul>
                 </div>
             {/if}
-        </div>
-    {/if}
+
+            {#if currentLocationInfo.connections.length > 0}
+                <div class="info-section">
+                    <div class="info-label">Connected To</div>
+                    <div class="connections-list">
+                        {#each currentLocationInfo.connections as conn}
+                            <span class="connection-chip">{conn.name}</span>
+                        {/each}
+                    </div>
+                </div>
+            {/if}
+        {:else}
+            <div class="no-location">
+                <span>No location data</span>
+            </div>
+        {/if}
+    </div>
 </div>
 
 <style>
@@ -608,121 +703,148 @@
         height: 100%;
     }
 
-    .graph-container {
-        width: 100%;
-        height: 100%;
-        min-height: 400px;
-        background: var(--bg-dark);
-        border-radius: 8px;
-        overflow: hidden;
+    .graph-wrapper.split-view {
+        display: flex;
+        gap: 0;
     }
 
-    .hover-preview {
-        position: absolute;
-        top: 12px;
-        right: 12px;
-        min-width: 180px;
-        max-width: 250px;
-        background: var(--bg-panel);
-        border: 1px solid var(--border-color, #333);
-        border-radius: 8px;
+    .map-side {
+        flex: 1;
+        position: relative;
+        min-width: 0;
+    }
+
+    .info-side {
+        width: 220px;
+        flex-shrink: 0;
         padding: 12px;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-        pointer-events: none;
-    }
-
-    .preview-main {
+        background: var(--bg-input, #2a2a3e);
+        border-left: 1px solid var(--border-color, #404060);
+        overflow-y: auto;
         display: flex;
         flex-direction: column;
-        gap: 6px;
+        gap: 10px;
     }
 
-    .preview-type {
-        font-size: 10px;
-        text-transform: uppercase;
-        font-weight: 600;
-        padding: 2px 6px;
-        border-radius: 3px;
-        width: fit-content;
-        background: #555;
-        color: #fff;
-    }
-
-    .preview-type.location { background: #74b9ff; }
-    .preview-type.objective { background: #00cec9; }
-    .preview-type.trainer { background: #d63031; }
-
-    .preview-label {
+    .location-name {
         font-size: 14px;
         font-weight: 600;
-        color: var(--text-primary);
+        color: var(--accent-primary, #74b9ff);
     }
 
-    .preview-desc {
+    .location-desc {
         font-size: 11px;
-        color: var(--text-muted);
+        color: var(--text-muted, #888);
         line-height: 1.4;
         margin: 0;
     }
 
-    .preview-badge {
-        font-size: 11px;
-        color: #fdcb6e;
-        font-weight: 500;
-    }
-
-    .preview-objectives {
-        margin-top: 4px;
-        padding-top: 6px;
-        border-top: 1px solid var(--border-color);
-    }
-
-    .objectives-title {
-        font-size: 10px;
-        color: var(--text-muted);
-        text-transform: uppercase;
-        display: block;
-        margin-bottom: 2px;
-    }
-
-    .objectives-list {
-        font-size: 11px;
-        color: #00cec9;
-        line-height: 1.4;
-    }
-
-    .preview-nearby {
+    .info-section {
         display: flex;
         flex-direction: column;
         gap: 6px;
     }
 
-    .nearby-title {
+    .info-label {
         font-size: 10px;
-        text-transform: uppercase;
-        color: var(--text-muted);
         font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: var(--text-muted, #888);
     }
 
-    .nearby-item {
+    .objectives-list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .objectives-list li {
+        font-size: 11px;
+        color: var(--text-secondary, #aaa);
+        display: flex;
+        align-items: flex-start;
+        gap: 6px;
+    }
+
+    .objectives-list li.completed {
+        color: var(--text-muted, #666);
+        text-decoration: line-through;
+    }
+
+    .obj-marker {
+        color: var(--accent-primary, #74b9ff);
+        flex-shrink: 0;
+    }
+
+    .objectives-list li.completed .obj-marker {
+        color: #00b894;
+    }
+
+    .connections-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+    }
+
+    .connection-chip {
+        font-size: 10px;
+        padding: 2px 6px;
+        background: var(--bg-panel, #3a3a4e);
+        border-radius: 4px;
+        color: var(--text-secondary, #aaa);
+    }
+
+    .no-location {
         display: flex;
         align-items: center;
-        gap: 8px;
-    }
-
-    .nearby-dot {
-        width: 8px;
-        height: 8px;
-        border-radius: 50%;
-        background: #555;
-    }
-
-    .nearby-dot.location { background: #74b9ff; }
-    .nearby-dot.objective { background: #00cec9; }
-    .nearby-dot.trainer { background: #d63031; }
-
-    .nearby-name {
+        justify-content: center;
+        height: 100%;
+        color: var(--text-muted, #666);
         font-size: 12px;
-        color: var(--text-secondary);
     }
+
+    .graph-container {
+        width: 100%;
+        height: 100%;
+        min-height: 200px;
+        background: var(--bg-dark, #1a1a2e);
+        border-radius: 8px 0 0 8px;
+        overflow: hidden;
+    }
+
+    .map-controls {
+        position: absolute;
+        bottom: 8px;
+        left: 8px;
+        display: flex;
+        gap: 4px;
+        z-index: 10;
+    }
+
+    .map-ctrl-btn {
+        width: 24px;
+        height: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--bg-panel, #2d2d44);
+        border: 1px solid var(--border-color, #404060);
+        border-radius: 4px;
+        color: var(--text-secondary, #b0b0c0);
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.15s;
+    }
+
+    .map-ctrl-btn:hover {
+        background: var(--bg-input, #3d3d54);
+        color: var(--text-primary, #fff);
+        border-color: var(--accent-primary, #74b9ff);
+    }
+
 </style>

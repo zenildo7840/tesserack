@@ -76,16 +76,24 @@
     .lab-canvas-container {
         position: relative;
         background: #000;
-        border-radius: 8px;
+        border-radius: 4px;
         overflow: hidden;
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
     }
 
     .lab-canvas {
-        width: 100%;
-        height: auto;
+        max-width: 100%;
+        max-height: 100%;
         aspect-ratio: 160 / 144;
         image-rendering: pixelated;
         display: block;
+        /* Scale up to fill container while maintaining aspect ratio */
+        width: auto;
+        height: 100%;
     }
 
     .error-message {

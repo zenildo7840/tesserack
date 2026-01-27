@@ -368,6 +368,10 @@
             <li class="todo">Reach Boulder Badge without LLM</li>
         </ul>
 
+        <div class="data-notice">
+            <strong>Data Storage:</strong> When using browser-based WebGPU inference, all data (training progress, experiences, model weights) is stored locally in your browser and persists across sessions. This data is specific to your browser and device. Use Export to back up or transfer your data. External API providers may have different data handling policies.
+        </div>
+
         <div class="about-footer">
             <a href="https://github.com/sidmohan0/tesserack" target="_blank" rel="noopener" class="github-link">
                 <Github size={16} />
@@ -587,6 +591,20 @@
     .roadmap {
         list-style: none;
         padding-left: 0;
+    }
+
+    .data-notice {
+        margin-top: 16px;
+        padding: 12px;
+        background: var(--bg-input);
+        border-radius: 6px;
+        font-size: 12px;
+        color: var(--text-muted);
+        line-height: 1.5;
+    }
+
+    .data-notice strong {
+        color: var(--text-secondary);
     }
 
     .roadmap li {

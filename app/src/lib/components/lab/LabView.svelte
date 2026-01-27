@@ -1,11 +1,13 @@
 <script>
     import { onMount, onDestroy } from 'svelte';
-    import { Play, Pause, RotateCcw, Save, FolderOpen, FastForward, SkipForward, ChevronDown } from 'lucide-svelte';
+    import { get } from 'svelte/store';
+    import { Play, Pause, RotateCcw, Save, FolderOpen, FastForward, SkipForward, ChevronDown, Download, Check, Loader } from 'lucide-svelte';
     import LabCanvas from './LabCanvas.svelte';
     import ModeToggle from './ModeToggle.svelte';
     import HyperparamsPopover from './HyperparamsPopover.svelte';
     import MetricsChart from './MetricsChart.svelte';
     import RewardBar from './RewardBar.svelte';
+    import WalkthroughGraph from './WalkthroughGraph.svelte';
     import {
         walkthroughGraph,
         currentGraphLocation,
@@ -30,13 +32,24 @@
         updateRLConfig
     } from '$lib/core/lab/lab-init.js';
     import { feedSystem } from '$lib/stores/feed';
+    import { llmState, PROVIDERS, setModel, setLLMProgress, setLLMReady, setLLMError } from '$lib/stores/llm';
+    import { initBrowserLLM } from '$lib/core/llm.js';
 
     let isRunning = false;
     let labInitialized = false;
     let hyperparamsOpen = false;
+    let howItWorksExpanded = false;
 
     // Mode: 'play' (LLM) or 'train' (RL)
     $: mode = $labMode === 'purerl' ? 'train' : 'play';
+
+    // LLM model state for Play mode
+    let modelLoading = false;
+    let modelLoadProgress = 0;
+    let modelLoadMessage = '';
+    $: browserModels = PROVIDERS.browser.models;
+    $: selectedModel = $llmState.model;
+    $: isModelReady = $llmState.status === 'ready';
 
     // Playback controls
     let playbackSpeed = 1;
@@ -112,10 +125,56 @@
         setLabMode(newMode === 'train' ? 'purerl' : 'llm');
     }
 
-    function toggleRun() {
+    async function loadBrowserModel() {
+        if (modelLoading) return;
+
+        modelLoading = true;
+        modelLoadProgress = 0;
+        modelLoadMessage = 'Initializing...';
+        feedSystem('Loading browser AI model...');
+
+        try {
+            await initBrowserLLM(selectedModel, (progress) => {
+                modelLoadProgress = progress.progress || 0;
+                modelLoadMessage = progress.text || 'Loading...';
+                setLLMProgress(progress);
+                if (progress.progress < 1) {
+                    const pct = Math.round(progress.progress * 100);
+                    if (pct % 10 === 0) {
+                        feedSystem(`Downloading model: ${pct}%`);
+                    }
+                }
+            });
+            setLLMReady();
+            feedSystem('AI model loaded!');
+        } catch (err) {
+            console.error('Model load failed:', err);
+            setLLMError(err);
+            feedSystem(`Model load failed: ${err.message}`);
+        } finally {
+            modelLoading = false;
+        }
+    }
+
+    function handleModelChange(e) {
+        setModel(e.target.value);
+    }
+
+    async function toggleRun() {
         if (!labInitialized) {
             feedSystem('Please wait for Lab to initialize...');
             return;
+        }
+
+        // For Play mode, check if LLM model is ready
+        if (mode === 'play' && get(llmState).status !== 'ready') {
+            // Auto-load the model if not ready
+            await loadBrowserModel();
+            // Check store directly after loading (use get() for synchronous read)
+            if (get(llmState).status !== 'ready') {
+                feedSystem('Cannot start: model failed to load');
+                return;
+            }
         }
 
         isRunning = !isRunning;
@@ -330,16 +389,32 @@
 
     <!-- Main Content -->
     <div class="main-content">
-        <!-- Game Canvas (60%) -->
+        <!-- Game Column (60%) -->
         <div class="game-area">
-            <div class="canvas-wrapper">
-                <LabCanvas on:initialized={handleLabInitialized} />
+            <div class="game-container">
+                <div class="container-label">Game View</div>
+                <div class="canvas-wrapper">
+                    <LabCanvas on:initialized={handleLabInitialized} />
+                </div>
             </div>
         </div>
 
         <!-- Metrics Panel (40%) -->
         <div class="metrics-panel">
             {#if mode === 'train'}
+                <!-- Train Mode: How it Works (Collapsible) -->
+                <button class="how-it-works-toggle" on:click={() => howItWorksExpanded = !howItWorksExpanded}>
+                    <span class="section-header">REINFORCE Training</span>
+                    <ChevronDown size={14} class="toggle-icon {howItWorksExpanded ? 'expanded' : ''}" />
+                </button>
+                {#if howItWorksExpanded}
+                    <p class="how-desc">
+                        Pure reinforcement learning with REINFORCE. The agent samples actions from a policy network, collects rewards from game events (movement, new maps, badges), and updates weights via policy gradient after each rollout.
+                    </p>
+                {/if}
+
+                <div class="metrics-divider"></div>
+
                 <!-- Train Mode Metrics -->
                 <div class="metrics-section">
                     <div class="metric-row">
@@ -393,7 +468,62 @@
                     <MetricsChart history={$pureRLMetrics.history} />
                 </div>
 
+                <div class="metrics-divider"></div>
+
+                <!-- Reward Breakdown -->
+                <div class="reward-section">
+                    <div class="section-header">Reward Breakdown</div>
+                    <RewardBar breakdown={$pureRLMetrics.breakdown} />
+                </div>
+
             {:else}
+                <!-- Play Mode: How it Works (Collapsible) -->
+                <button class="how-it-works-toggle" on:click={() => howItWorksExpanded = !howItWorksExpanded}>
+                    <span class="section-header">LLM-Guided Agent</span>
+                    <ChevronDown size={14} class="toggle-icon {howItWorksExpanded ? 'expanded' : ''}" />
+                </button>
+                {#if howItWorksExpanded}
+                    <p class="how-desc">
+                        A browser-based LLM reads the game state (location, party, items) and strategy guide context to generate action plans. The agent executes these plans while tracking progress toward walkthrough objectives.
+                    </p>
+                {/if}
+
+                <div class="metrics-divider"></div>
+
+                <!-- Play Mode: Model Configuration -->
+                <div class="metrics-section model-config">
+                    <div class="section-header">Browser Model</div>
+                    <div class="model-select-row">
+                        <select
+                            value={selectedModel}
+                            on:change={handleModelChange}
+                            disabled={modelLoading || isRunning}
+                        >
+                            {#each browserModels as model}
+                                <option value={model.id}>{model.name} ({model.size})</option>
+                            {/each}
+                        </select>
+                        {#if isModelReady}
+                            <span class="model-status ready"><Check size={14} /> Ready</span>
+                        {:else if modelLoading}
+                            <span class="model-status loading"><Loader size={14} class="spin" /> {Math.round(modelLoadProgress * 100)}%</span>
+                        {:else}
+                            <button class="load-btn" on:click={loadBrowserModel} disabled={isRunning}>
+                                <Download size={14} />
+                                <span>Load</span>
+                            </button>
+                        {/if}
+                    </div>
+                    {#if modelLoading}
+                        <div class="model-progress">
+                            <div class="model-progress-fill" style="width: {modelLoadProgress * 100}%"></div>
+                        </div>
+                        <div class="model-progress-text">{modelLoadMessage}</div>
+                    {/if}
+                </div>
+
+                <div class="metrics-divider"></div>
+
                 <!-- Play Mode Metrics -->
                 <div class="metrics-section">
                     <div class="metric-row">
@@ -435,19 +565,31 @@
         </div>
     </div>
 
-    <!-- Bottom Bar -->
-    <div class="bottom-bar">
-        {#if mode === 'train'}
-            <RewardBar breakdown={$pureRLMetrics.breakdown} />
-        {:else}
+    <!-- Map Row -->
+    <div class="map-row">
+        <div class="map-container">
+            <div class="container-label">Kanto Map</div>
+            <div class="map-wrapper">
+                <WalkthroughGraph
+                    graphData={$walkthroughGraph}
+                    currentLocation={$currentGraphLocation}
+                    completedObjectives={$completedObjectives}
+                />
+            </div>
+        </div>
+    </div>
+
+    <!-- Bottom Bar (Play mode only) -->
+    {#if mode === 'play'}
+        <div class="bottom-bar">
             <div class="progress-bar-container">
                 <div class="progress-bar">
                     <div class="progress-fill" style="width: {$completionPercentage}%"></div>
                 </div>
                 <span class="progress-label">{$completionPercentage}% complete</span>
             </div>
-        {/if}
-    </div>
+        </div>
+    {/if}
 </div>
 
 <style>
@@ -455,8 +597,8 @@
         display: flex;
         flex-direction: column;
         height: 100%;
-        gap: 12px;
-        padding: 12px;
+        gap: 8px;
+        padding: 8px;
         background: var(--bg-main);
     }
 
@@ -715,42 +857,87 @@
     .main-content {
         flex: 1;
         display: flex;
-        gap: 12px;
+        gap: 8px;
         min-height: 0;
     }
 
     .game-area {
         flex: 6;
         display: flex;
-        align-items: center;
-        justify-content: center;
+        flex-direction: column;
+        min-height: 0;
+    }
+
+    .game-container {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
         background: var(--bg-panel);
         border-radius: 8px;
-        padding: 12px;
+        overflow: hidden;
+        min-height: 0;
+    }
+
+    /* Map Row */
+    .map-row {
+        flex-shrink: 0;
+        height: 280px;
+    }
+
+    .map-container {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        background: var(--bg-panel);
+        border-radius: 8px;
         overflow: hidden;
     }
 
+    .container-label {
+        flex-shrink: 0;
+        padding: 8px 12px;
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: var(--text-muted);
+        background: var(--bg-input);
+        border-bottom: 1px solid var(--border-color);
+    }
+
     .canvas-wrapper {
-        width: 100%;
-        height: 100%;
+        flex: 1;
         display: flex;
         align-items: center;
         justify-content: center;
-        border-radius: 8px;
+        min-height: 0;
         overflow: hidden;
-        border: 2px solid var(--border-color);
+        padding: 0;
+    }
+
+    .canvas-wrapper :global(.lab-canvas-container) {
+        width: auto;
+        height: 100%;
+        max-width: 100%;
+    }
+
+    .map-wrapper {
+        flex: 1;
+        min-height: 0;
+        height: 100%;
     }
 
     /* Metrics Panel */
     .metrics-panel {
-        flex: 4;
+        flex: 2.5;
         display: flex;
         flex-direction: column;
         gap: 8px;
-        padding: 16px;
+        padding: 12px;
         background: var(--bg-panel);
         border-radius: 8px;
         overflow-y: auto;
+        min-width: 200px;
     }
 
     .metrics-section {
@@ -869,6 +1056,156 @@
         color: var(--text-muted);
         font-style: italic;
         margin: 0;
+    }
+
+    /* How It Works (Collapsible) */
+    .how-it-works-toggle {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        width: 100%;
+        padding: 0;
+        background: none;
+        border: none;
+        cursor: pointer;
+        color: var(--text-secondary);
+    }
+
+    .how-it-works-toggle:hover {
+        color: var(--text-primary);
+    }
+
+    .how-it-works-toggle :global(.toggle-icon) {
+        transition: transform 0.2s;
+    }
+
+    .how-it-works-toggle :global(.toggle-icon.expanded) {
+        transform: rotate(180deg);
+    }
+
+    .how-desc {
+        font-size: 12px;
+        color: var(--text-secondary);
+        line-height: 1.5;
+        margin: 4px 0 0 0;
+    }
+
+    /* Model Configuration */
+    .model-config {
+        gap: 10px;
+    }
+
+    .section-header {
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: var(--text-muted);
+    }
+
+    .model-select-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .model-select-row select {
+        flex: 1;
+        padding: 8px 10px;
+        background: var(--bg-input);
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        color: var(--text-primary);
+        font-size: 12px;
+        cursor: pointer;
+    }
+
+    .model-select-row select:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
+    .model-select-row select:focus {
+        outline: none;
+        border-color: var(--accent-primary);
+    }
+
+    .model-status {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 11px;
+        font-weight: 500;
+        padding: 4px 8px;
+        border-radius: 4px;
+        white-space: nowrap;
+    }
+
+    .model-status.ready {
+        color: #00b894;
+        background: rgba(0, 184, 148, 0.1);
+    }
+
+    .model-status.loading {
+        color: var(--accent-primary);
+        background: rgba(116, 185, 255, 0.1);
+    }
+
+    .model-status.loading :global(svg) {
+        animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+    }
+
+    .load-btn {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        padding: 6px 12px;
+        background: var(--accent-primary);
+        color: white;
+        border: none;
+        border-radius: 6px;
+        font-size: 12px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: filter 0.15s;
+        white-space: nowrap;
+    }
+
+    .load-btn:hover:not(:disabled) {
+        filter: brightness(1.1);
+    }
+
+    .load-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    .model-progress {
+        width: 100%;
+        height: 4px;
+        background: var(--bg-input);
+        border-radius: 2px;
+        overflow: hidden;
+    }
+
+    .model-progress-fill {
+        height: 100%;
+        background: var(--accent-primary);
+        border-radius: 2px;
+        transition: width 0.2s ease-out;
+    }
+
+    .model-progress-text {
+        font-size: 10px;
+        color: var(--text-muted);
+        text-overflow: ellipsis;
+        overflow: hidden;
+        white-space: nowrap;
     }
 
     /* Bottom Bar */
