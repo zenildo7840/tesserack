@@ -58,6 +58,8 @@
     // Save states
     let savedStates = [];
     let showSaveStates = false;
+    let autosaveEnabled = false;
+    let autosaveInterval = null;
 
     // Algorithm options (for future PPO etc)
     const algorithms = [
@@ -104,12 +106,35 @@
         try {
             const stored = localStorage.getItem('tesserack_lab_states');
             if (stored) savedStates = JSON.parse(stored);
+            // Restore autosave preference
+            autosaveEnabled = localStorage.getItem('tesserack_autosave') === 'true';
         } catch (e) {}
     });
 
     onDestroy(() => {
         if (isRunning) stopLabAgent();
+        if (autosaveInterval) clearInterval(autosaveInterval);
     });
+
+    // Handle autosave toggle
+    $: {
+        if (autosaveEnabled && labInitialized) {
+            if (!autosaveInterval) {
+                autosaveInterval = setInterval(() => {
+                    if (labInitialized && isRunning) {
+                        saveState();
+                    }
+                }, 30000); // Every 30 seconds
+            }
+            localStorage.setItem('tesserack_autosave', 'true');
+        } else {
+            if (autosaveInterval) {
+                clearInterval(autosaveInterval);
+                autosaveInterval = null;
+            }
+            localStorage.setItem('tesserack_autosave', 'false');
+        }
+    }
 
     function handleLabInitialized() {
         labInitialized = true;
@@ -326,6 +351,10 @@
         </div>
 
         <div class="header-right">
+            <label class="header-btn autosave-toggle" title="Auto-save every 30s while running">
+                <input type="checkbox" bind:checked={autosaveEnabled} />
+                <span>Auto</span>
+            </label>
             <button class="header-btn" on:click={saveState} title="Save state">
                 <Save size={16} />
             </button>
@@ -660,6 +689,47 @@
         padding: 6px 10px;
         font-size: 11px;
         font-weight: 600;
+    }
+
+    .autosave-toggle {
+        cursor: pointer;
+        padding: 6px 10px;
+        gap: 6px;
+    }
+
+    .autosave-toggle input[type="checkbox"] {
+        appearance: none;
+        width: 14px;
+        height: 14px;
+        border: 1.5px solid var(--border-color);
+        border-radius: 3px;
+        background: var(--bg-input);
+        cursor: pointer;
+        transition: all 0.15s;
+        margin: 0;
+    }
+
+    .autosave-toggle input[type="checkbox"]:checked {
+        background: var(--accent-primary);
+        border-color: var(--accent-primary);
+    }
+
+    .autosave-toggle input[type="checkbox"]:checked::after {
+        content: '✓';
+        display: block;
+        color: white;
+        font-size: 10px;
+        line-height: 11px;
+        text-align: center;
+    }
+
+    .autosave-toggle span {
+        font-size: 11px;
+        font-weight: 500;
+    }
+
+    .autosave-toggle:hover input[type="checkbox"] {
+        border-color: var(--text-muted);
     }
 
     /* Responsive header */
