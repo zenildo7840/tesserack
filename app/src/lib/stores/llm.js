@@ -76,6 +76,15 @@ export const PROVIDERS = {
         models: [], // Fetched dynamically
         detectEndpoint: 'http://localhost:1234/v1',
     },
+    llamacpp: {
+        id: 'llamacpp',
+        name: 'llama.cpp (Local)',
+        description: 'Local llama.cpp server',
+        needsKey: false,
+        endpoint: 'http://localhost:8080/v1',
+        models: [], // Fetched dynamically
+        detectEndpoint: 'http://localhost:8080/v1',
+    },
     custom: {
         id: 'custom',
         name: 'Custom Endpoint',
@@ -92,6 +101,8 @@ const KEYS = {
     model: 'tesserack-llm-model',
     customEndpoint: 'tesserack-llm-custom-endpoint',
     customModel: 'tesserack-llm-custom-model',
+    llamacppEndpoint: 'tesserack-llm-llamacpp-endpoint',
+    llamacppModel: 'tesserack-llm-llamacpp-model',
 };
 
 // Get provider-specific API key storage key
@@ -153,6 +164,8 @@ function getInitialState() {
         apiKey: getApiKeyForProvider(providerId),
         customEndpoint: getStored(KEYS.customEndpoint, ''),
         customModel: getStored(KEYS.customModel, ''),
+        llamacppEndpoint: getStored(KEYS.llamacppEndpoint, 'http://localhost:8080/v1'),
+        llamacppModel: getStored(KEYS.llamacppModel, ''),
 
         // Connection status (runtime only)
         connectionStatus: 'unknown', // 'unknown' | 'checking' | 'connected' | 'error'
@@ -257,6 +270,16 @@ export function setCustomModel(model) {
     llmState.update(state => ({ ...state, customModel: model }));
 }
 
+export function setLlamacppEndpoint(endpoint) {
+    setStored(KEYS.llamacppEndpoint, endpoint);
+    llmState.update(state => ({ ...state, llamacppEndpoint: endpoint }));
+}
+
+export function setLlamacppModel(model) {
+    setStored(KEYS.llamacppModel, model);
+    llmState.update(state => ({ ...state, llamacppModel: model }));
+}
+
 // Connection status helpers
 export function setConnectionStatus(status) {
     llmState.update(state => ({ ...state, connectionStatus: status }));
@@ -279,6 +302,9 @@ export function getConfig() {
     if (providerId === 'custom') {
         endpoint = getStored(KEYS.customEndpoint, '');
         finalModel = getStored(KEYS.customModel, '') || model;
+    } else if (providerId === 'llamacpp') {
+        endpoint = getStored(KEYS.llamacppEndpoint, 'http://localhost:8080/v1');
+        finalModel = getStored(KEYS.llamacppModel, '') || model;
     }
 
     return {

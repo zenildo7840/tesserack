@@ -7,7 +7,9 @@
         setModel,
         setApiKey,
         setCustomEndpoint,
-        setCustomModel
+        setCustomModel,
+        setLlamacppEndpoint,
+        setLlamacppModel
     } from '$lib/stores/llm';
     import { ChevronDown, ChevronUp, RefreshCw, Check, AlertCircle } from 'lucide-svelte';
     import { testConnection } from '$lib/core/llm.js';
@@ -18,6 +20,8 @@
     let apiKey = $llmState.apiKey;
     let customEndpoint = $llmState.customEndpoint;
     let customModel = $llmState.customModel;
+    let llamacppEndpoint = $llmState.llamacppEndpoint;
+    let llamacppModel = $llmState.llamacppModel;
     let showApiKey = false;
     let testing = false;
     let testResult = null; // null | 'success' | 'error'
@@ -30,6 +34,7 @@
     $: provider = PROVIDERS[$llmState.provider] || PROVIDERS.browser;
     $: isLocal = ['ollama', 'lmstudio'].includes($llmState.provider);
     $: isCustom = $llmState.provider === 'custom';
+    $: isLlamacpp = $llmState.provider === 'llamacpp';
     $: isBrowser = $llmState.provider === 'browser';
 
     function handleProviderChange(providerId) {
@@ -72,7 +77,7 @@
         testing = true;
         testResult = null;
         testError = '';
-        const endpoint = isCustom ? customEndpoint : provider.endpoint;
+        const endpoint = isCustom ? customEndpoint : isLlamacpp ? llamacppEndpoint : provider.endpoint;
         const result = await testConnection(endpoint, apiKey);
         testing = false;
         if (result.success) {
@@ -87,6 +92,9 @@
         if (isCustom) {
             customModel = modelId;
             setCustomModel(modelId);
+        } else if (isLlamacpp) {
+            llamacppModel = modelId;
+            setLlamacppModel(modelId);
         } else {
             setModel(modelId);
         }
@@ -211,6 +219,60 @@
                         </div>
                     </div>
 
+                {:else if isLlamacpp}
+                    <!-- llama.cpp Endpoint -->
+                    <div class="config-row">
+                        <div class="config-group">
+                            <label for="llamacpp-endpoint">Endpoint URL</label>
+                            <input
+                                id="llamacpp-endpoint"
+                                type="text"
+                                bind:value={llamacppEndpoint}
+                                on:blur={() => setLlamacppEndpoint(llamacppEndpoint)}
+                                placeholder="http://localhost:8080/v1"
+                            />
+                        </div>
+                        <div class="config-group">
+                            <label for="llamacpp-model">Model Name</label>
+                            <div class="input-with-btn">
+                                <input
+                                    id="llamacpp-model"
+                                    type="text"
+                                    bind:value={llamacppModel}
+                                    on:blur={() => setLlamacppModel(llamacppModel)}
+                                    placeholder="model-name"
+                                />
+                                <button
+                                    class="btn-icon"
+                                    class:spinning={testing}
+                                    on:click={handleTestConnection}
+                                    disabled={testing || !llamacppEndpoint}
+                                    title="Test connection & fetch models"
+                                >
+                                    <RefreshCw size={14} />
+                                </button>
+                            </div>
+                        </div>
+                        <div class="config-group">
+                            <label for="llamacpp-key">API Key <span class="optional">(optional)</span></label>
+                            <div class="input-with-btn">
+                                <input
+                                    id="llamacpp-key"
+                                    type={showApiKey ? 'text' : 'password'}
+                                    bind:value={apiKey}
+                                    on:blur={handleApiKeyBlur}
+                                    placeholder="sk-..."
+                                />
+                                <button
+                                    class="btn-icon"
+                                    on:click={() => showApiKey = !showApiKey}
+                                >
+                                    {showApiKey ? '🙈' : '👁️'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
                 {:else if isLocal}
                     <!-- Local Provider (Ollama/LM Studio) -->
                     <div class="config-row">
@@ -308,14 +370,14 @@
                 {/if}
 
                 <!-- Available models from API (for local/custom) -->
-                {#if (isLocal || isCustom) && $llmState.availableModels.length > 0}
+                {#if (isLocal || isCustom || isLlamacpp) && $llmState.availableModels.length > 0}
                     <div class="available-models">
                         <span class="label">Available models:</span>
                         <div class="model-chips">
                             {#each $llmState.availableModels as model}
                                 <button
                                     class="model-chip"
-                                    class:selected={$llmState.model === model.id || customModel === model.id}
+                                    class:selected={$llmState.model === model.id || customModel === model.id || llamacppModel === model.id}
                                     on:click={() => selectAvailableModel(model.id)}
                                 >
                                     {model.name}
@@ -326,7 +388,7 @@
                 {/if}
 
                 <!-- Connection Status for local/custom -->
-                {#if (isLocal || isCustom) && $llmState.connectionStatus !== 'unknown'}
+                {#if (isLocal || isCustom || isLlamacpp) && $llmState.connectionStatus !== 'unknown'}
                     <div class="connection-status" class:connected={$llmState.connectionStatus === 'connected'}>
                         {#if $llmState.connectionStatus === 'connected'}
                             <Check size={14} />

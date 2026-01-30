@@ -2,7 +2,7 @@
     import { onMount } from 'svelte';
     import { modelState } from '$lib/stores/training';
     import { romLoaded, romBuffer } from '$lib/stores/game';
-    import { llmState, tokenStats, PROVIDERS, setProvider, setModel, setApiKey } from '$lib/stores/llm';
+    import { llmState, tokenStats, PROVIDERS, setProvider, setModel, setApiKey, setCustomEndpoint, setCustomModel, setLlamacppEndpoint, setLlamacppModel } from '$lib/stores/llm';
     import { theme } from '$lib/stores/theme';
     import { feedSystem } from '$lib/stores/feed';
     import { hasROM, loadROM, saveROM } from '$lib/core/persistence.js';
@@ -30,10 +30,17 @@
     let testing = false;
     let testResult = null;
     let testError = '';
+    let customEndpoint = $llmState.customEndpoint || '';
+    let customModel = $llmState.customModel || '';
+    let llamacppEndpoint = $llmState.llamacppEndpoint || 'http://localhost:8080/v1';
+    let llamacppModel = $llmState.llamacppModel || '';
 
     $: hasTokenStats = $tokenStats.requestCount > 0;
     $: provider = PROVIDERS[$llmState.provider] || PROVIDERS.browser;
     $: isBrowser = $llmState.provider === 'browser';
+    $: isCustom = $llmState.provider === 'custom';
+    $: isLlamacpp = $llmState.provider === 'llamacpp';
+    $: isConfigurable = isCustom || isLlamacpp;
     $: needsApiKey = provider.needsKey && !$llmState.apiKey;
 
     // Build timestamp injected by Vite
@@ -121,7 +128,8 @@
     async function handleTestConnection() {
         testing = true;
         testResult = null;
-        const result = await testConnection(provider.endpoint, apiKey);
+        const endpoint = isCustom ? customEndpoint : isLlamacpp ? llamacppEndpoint : provider.endpoint;
+        const result = await testConnection(endpoint, apiKey);
         testing = false;
         if (result.success) {
             testResult = 'success';
@@ -279,32 +287,33 @@
                         </div>
                     </div>
 
-                    <div class="panel-section">
-                        <label class="section-label">Model</label>
-                        <select value={$llmState.model} on:change={handleModelChange}>
-                            {#each provider.models || [] as model}
-                                <option value={model.id}>{model.name}</option>
-                            {/each}
-                        </select>
-                    </div>
-
-                    {#if provider.needsKey}
+                    {#if isLlamacpp}
+                        <!-- llama.cpp endpoint config -->
                         <div class="panel-section">
-                            <label class="section-label">API Key</label>
+                            <label class="section-label">Endpoint URL</label>
+                            <input
+                                class="config-input"
+                                type="text"
+                                bind:value={llamacppEndpoint}
+                                on:blur={() => setLlamacppEndpoint(llamacppEndpoint)}
+                                placeholder="http://localhost:8080/v1"
+                            />
+                        </div>
+
+                        <div class="panel-section">
+                            <label class="section-label">Model</label>
                             <div class="api-key-row">
                                 <input
-                                    type={showApiKey ? 'text' : 'password'}
-                                    bind:value={apiKey}
-                                    on:blur={handleApiKeyBlur}
-                                    placeholder="Enter API key"
+                                    class="config-input"
+                                    type="text"
+                                    bind:value={llamacppModel}
+                                    on:blur={() => setLlamacppModel(llamacppModel)}
+                                    placeholder="model-name"
                                 />
-                                <button class="icon-btn" on:click={() => showApiKey = !showApiKey}>
-                                    {showApiKey ? '🙈' : '👁️'}
-                                </button>
                                 <button
                                     class="icon-btn test-btn"
                                     on:click={handleTestConnection}
-                                    disabled={testing || !apiKey}
+                                    disabled={testing || !llamacppEndpoint}
                                     class:spinning={testing}
                                 >
                                     {#if testResult === 'success'}
@@ -314,10 +323,160 @@
                                     {/if}
                                 </button>
                             </div>
-                            {#if testResult === 'error'}
-                                <div class="test-error">{testError}</div>
-                            {/if}
                         </div>
+
+                        <div class="panel-section">
+                            <label class="section-label">API Key <span class="optional-label">(optional)</span></label>
+                            <div class="api-key-row">
+                                <input
+                                    type={showApiKey ? 'text' : 'password'}
+                                    bind:value={apiKey}
+                                    on:blur={handleApiKeyBlur}
+                                    placeholder="sk-..."
+                                />
+                                <button class="icon-btn" on:click={() => showApiKey = !showApiKey}>
+                                    {showApiKey ? '🙈' : '👁️'}
+                                </button>
+                            </div>
+                        </div>
+
+                        {#if $llmState.availableModels.length > 0}
+                            <div class="panel-section">
+                                <label class="section-label">Available Models</label>
+                                <div class="model-chips">
+                                    {#each $llmState.availableModels as model}
+                                        <button
+                                            class="model-chip"
+                                            class:selected={llamacppModel === model.id}
+                                            on:click={() => { llamacppModel = model.id; setLlamacppModel(model.id); }}
+                                        >
+                                            {model.name || model.id}
+                                        </button>
+                                    {/each}
+                                </div>
+                            </div>
+                        {/if}
+
+                        {#if testResult === 'error'}
+                            <div class="test-error">{testError}</div>
+                        {/if}
+
+                    {:else if isCustom}
+                        <!-- Custom endpoint config -->
+                        <div class="panel-section">
+                            <label class="section-label">Endpoint URL</label>
+                            <input
+                                class="config-input"
+                                type="text"
+                                bind:value={customEndpoint}
+                                on:blur={() => setCustomEndpoint(customEndpoint)}
+                                placeholder="https://api.example.com/v1"
+                            />
+                        </div>
+
+                        <div class="panel-section">
+                            <label class="section-label">Model</label>
+                            <div class="api-key-row">
+                                <input
+                                    class="config-input"
+                                    type="text"
+                                    bind:value={customModel}
+                                    on:blur={() => setCustomModel(customModel)}
+                                    placeholder="model-name"
+                                />
+                                <button
+                                    class="icon-btn test-btn"
+                                    on:click={handleTestConnection}
+                                    disabled={testing || !customEndpoint}
+                                    class:spinning={testing}
+                                >
+                                    {#if testResult === 'success'}
+                                        <Check size={14} />
+                                    {:else}
+                                        <RefreshCw size={14} />
+                                    {/if}
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="panel-section">
+                            <label class="section-label">API Key <span class="optional-label">(optional)</span></label>
+                            <div class="api-key-row">
+                                <input
+                                    type={showApiKey ? 'text' : 'password'}
+                                    bind:value={apiKey}
+                                    on:blur={handleApiKeyBlur}
+                                    placeholder="sk-..."
+                                />
+                                <button class="icon-btn" on:click={() => showApiKey = !showApiKey}>
+                                    {showApiKey ? '🙈' : '👁️'}
+                                </button>
+                            </div>
+                        </div>
+
+                        {#if $llmState.availableModels.length > 0}
+                            <div class="panel-section">
+                                <label class="section-label">Available Models</label>
+                                <div class="model-chips">
+                                    {#each $llmState.availableModels as model}
+                                        <button
+                                            class="model-chip"
+                                            class:selected={customModel === model.id}
+                                            on:click={() => { customModel = model.id; setCustomModel(model.id); }}
+                                        >
+                                            {model.name || model.id}
+                                        </button>
+                                    {/each}
+                                </div>
+                            </div>
+                        {/if}
+
+                        {#if testResult === 'error'}
+                            <div class="test-error">{testError}</div>
+                        {/if}
+
+                    {:else}
+                        <!-- Standard provider with preset models -->
+                        <div class="panel-section">
+                            <label class="section-label">Model</label>
+                            <select value={$llmState.model} on:change={handleModelChange}>
+                                {#each provider.models || [] as model}
+                                    <option value={model.id}>{model.name}</option>
+                                {/each}
+                            </select>
+                        </div>
+
+                        {#if provider.needsKey}
+                            <div class="panel-section">
+                                <label class="section-label">API Key</label>
+                                <div class="api-key-row">
+                                    <input
+                                        type={showApiKey ? 'text' : 'password'}
+                                        bind:value={apiKey}
+                                        on:blur={handleApiKeyBlur}
+                                        placeholder="Enter API key"
+                                    />
+                                    <button class="icon-btn" on:click={() => showApiKey = !showApiKey}>
+                                        {showApiKey ? '🙈' : '👁️'}
+                                    </button>
+                                    <button
+                                        class="icon-btn test-btn"
+                                        on:click={handleTestConnection}
+                                        disabled={testing || !apiKey}
+                                        class:spinning={testing}
+                                    >
+                                        {#if testResult === 'success'}
+                                            <Check size={14} />
+                                        {:else}
+                                            <RefreshCw size={14} />
+                                        {/if}
+                                    </button>
+                                </div>
+                                {#if testResult === 'error'}
+                                    <div class="test-error">{testError}</div>
+                                {/if}
+                            </div>
+                        {/if}
                     {/if}
 
                     {#if hasTokenStats}
@@ -1064,6 +1223,55 @@
         border-top: 1px solid var(--border-color);
         font-size: 12px;
         color: var(--text-muted);
+    }
+
+    .config-input {
+        width: 100%;
+        padding: 8px 12px;
+        background: var(--bg-input);
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        color: var(--text-primary);
+        font-size: 13px;
+    }
+
+    .config-input:focus {
+        outline: none;
+        border-color: var(--accent-primary);
+    }
+
+    .optional-label {
+        font-weight: 400;
+        text-transform: none;
+        color: var(--text-muted);
+    }
+
+    .model-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+
+    .model-chip {
+        padding: 4px 10px;
+        font-size: 11px;
+        background: var(--bg-input);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        color: var(--text-secondary);
+        cursor: pointer;
+        transition: all 0.15s;
+    }
+
+    .model-chip:hover {
+        border-color: var(--text-muted);
+        color: var(--text-primary);
+    }
+
+    .model-chip.selected {
+        background: var(--accent-primary);
+        border-color: var(--accent-primary);
+        color: white;
     }
 
     .panel-section.stats span {
